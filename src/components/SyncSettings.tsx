@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Cloud, CloudOff, RefreshCw, Calendar, Check, LogOut, ChevronRight } from "lucide-react";
+import { Loader2, RefreshCw, Check, LogOut, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 
 // Import logos
+import logoGoogleDrive from "@/assets/logo-google-drive.png";
 import logoGoogleCalendar from "@/assets/logo-google-calendar.png";
 import logoClickUp from "@/assets/logo-clickup.png";
 import logoNotion from "@/assets/logo-notion.png";
@@ -236,12 +237,12 @@ const SyncSettings = () => {
 
   return (
     <div className="space-y-6 p-4 max-w-2xl mx-auto">
-      {/* Google Account & Drive Sync Section */}
+      {/* Google Drive Cloud Sync Section */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-green-500">
-              <Cloud className="h-6 w-6 text-white" />
+            <div className="p-2 rounded-lg bg-background border border-border">
+              <img src={logoGoogleDrive} alt="Google Drive" className="h-8 w-8" />
             </div>
             <div className="flex-1">
               <CardTitle className="text-lg">{t('sync.cloudSync')}</CardTitle>
@@ -279,7 +280,7 @@ const SyncSettings = () => {
                 <div className="p-3 bg-muted/30 rounded-lg space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{t('sync.cloudBackup')}</span>
-                    <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <span className="flex items-center gap-1 text-primary">
                       <Check className="h-4 w-4" />
                       {cloudBackupInfo.exists ? t('sync.available') : t('sync.notAvailable')}
                     </span>
@@ -338,7 +339,7 @@ const SyncSettings = () => {
               onClick={handleSignIn}
             >
               <img 
-                src="https://www.google.com/favicon.ico" 
+                src={logoGoogleDrive} 
                 alt="Google" 
                 className="h-5 w-5"
               />
@@ -348,26 +349,41 @@ const SyncSettings = () => {
         </CardContent>
       </Card>
 
-      {/* Google Calendar Section - Only show when signed in */}
-      {isAuthenticated && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-background">
-                <img src={logoGoogleCalendar} alt="Google Calendar" className="h-8 w-8" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-lg">Google Calendar</CardTitle>
-                <CardDescription>{t('sync.syncWithCalendar')}</CardDescription>
-              </div>
+      {/* Google Calendar Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-background border border-border">
+              <img src={logoGoogleCalendar} alt="Google Calendar" className="h-8 w-8" />
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-lg">{t('sync.googleCalendar')}</CardTitle>
+              <CardDescription>{t('sync.syncWithCalendar')}</CardDescription>
+            </div>
+            {isAuthenticated && (
               <Switch
                 checked={calendarSyncEnabled}
                 onCheckedChange={handleCalendarSyncToggle}
               />
-            </div>
-          </CardHeader>
-          {calendarSyncEnabled && (
-            <CardContent className="space-y-4">
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!isAuthenticated ? (
+            <Button 
+              variant="outline" 
+              className={connectButtonStyles}
+              onClick={handleSignIn}
+            >
+              <img 
+                src={logoGoogleCalendar} 
+                alt="Google Calendar" 
+                className="h-5 w-5"
+              />
+              {t('sync.signInWithGoogle')}
+            </Button>
+          ) : calendarSyncEnabled ? (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label>{t('sync.selectCalendar')}</Label>
                 <Select value={selectedCalendarId} onValueChange={handleCalendarSelect}>
@@ -398,10 +414,12 @@ const SyncSettings = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('sync.syncWithCalendar')}</p>
           )}
-        </Card>
-      )}
+        </CardContent>
+      </Card>
 
       {/* Integrations Section */}
       <Card>
