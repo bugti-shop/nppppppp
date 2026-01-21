@@ -501,29 +501,32 @@ export default function OnboardingFlow({
               <span className="ml-2 text-gray-500">{t('onboarding.paywall.loadingPrices')}</span>
             </div>
           ) : (
-            <div className="flex gap-2 justify-center w-full">
+            <div className="flex gap-3 justify-center w-full">
               {/* Weekly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center ${plan === 'weekly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2 whitespace-nowrap">
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-4 flex-1 text-center relative flex flex-col items-center justify-center min-h-[80px] ${plan === 'weekly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[11px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap">
                   {t('onboarding.paywall.daysFree', { days: weeklyTrialDays })}
                 </span>
-                <p className="font-semibold text-sm">{t('onboarding.paywall.weekly', 'Weekly')}</p>
-                <p className="text-gray-600 text-xs mt-0.5">{weeklyPrice}</p>
+                <p className="font-semibold text-base">{t('onboarding.paywall.weekly', 'Weekly')}</p>
+                <p className="text-gray-600 text-sm mt-1">{weeklyPrice}</p>
               </button>
 
               {/* Monthly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center ${plan === 'monthly' ? 'border-[#3c78f0] bg-gray-50' : 'border-gray-200'}`}>
-                <p className="font-semibold text-sm">{t('onboarding.paywall.monthly')}</p>
-                <p className="text-gray-600 text-xs mt-0.5">{monthlyPrice}</p>
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border-2 rounded-xl p-4 flex-1 text-center relative flex flex-col items-center justify-center min-h-[80px] ${plan === 'monthly' ? 'border-[#3c78f0] bg-gray-50' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[11px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap">
+                  {t('onboarding.paywall.daysFree', { days: 3 })}
+                </span>
+                <p className="font-semibold text-base">{t('onboarding.paywall.monthly')}</p>
+                <p className="text-gray-600 text-sm mt-1">{monthlyPrice}</p>
               </button>
 
               {/* Yearly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center ${plan === 'yearly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2 whitespace-nowrap">
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-4 flex-1 text-center relative flex flex-col items-center justify-center min-h-[80px] ${plan === 'yearly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[11px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap">
                   {t('onboarding.paywall.daysFree', { days: yearlyTrialDays })}
                 </span>
-                <p className="font-semibold text-sm">{t('onboarding.paywall.yearly')}</p>
-                <p className="text-gray-600 text-xs mt-0.5">{yearlyMonthlyEquivalent}</p>
+                <p className="font-semibold text-base">{t('onboarding.paywall.yearly')}</p>
+                <p className="text-gray-600 text-sm mt-1">{yearlyMonthlyEquivalent}</p>
               </button>
             </div>
           )}
@@ -602,11 +605,11 @@ export default function OnboardingFlow({
                 className="w-80 mt-4 btn-duo disabled:opacity-50"
               >
                 {isPurchasing ? t('onboarding.paywall.processing') : (
-                  plan === 'yearly' 
-                    ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.yearly.trialDays }) 
-                    : plan === 'weekly'
-                      ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.weekly.trialDays })
-                      : t('onboarding.paywall.startTrialButtonMonthly')
+                  plan === 'monthly'
+                    ? t('onboarding.paywall.startTrialButton', { days: 3 })
+                    : plan === 'yearly' 
+                      ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.yearly.trialDays }) 
+                      : t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.weekly.trialDays })
                 )}
               </button>
 
