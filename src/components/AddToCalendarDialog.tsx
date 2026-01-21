@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import { useGoogleAuth } from "@/contexts/GoogleAuthContext";
 import { GoogleCalendarSyncManager, getCalendarSyncSettings } from "@/utils/googleCalendarSync";
 import { useToast } from "@/hooks/use-toast";
 import { TodoItem } from "@/types/note";
+import { getSetting, setSetting } from "@/utils/settingsStorage";
 
 interface AddToCalendarDialogProps {
   isOpen: boolean;
@@ -32,11 +34,17 @@ export const AddToCalendarDialog = ({
   const { toast } = useToast();
   const { tokens, isAuthenticated } = useGoogleAuth();
   const [isCreating, setIsCreating] = useState(false);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
 
   const handleAddToCalendar = async () => {
     if (!tokens?.accessToken || !task.dueDate) {
       onClose();
       return;
+    }
+
+    // Save preference if "Don't ask again" is checked
+    if (dontAskAgain) {
+      await setSetting('calendar_prompt_disabled', true);
     }
 
     setIsCreating(true);
@@ -68,12 +76,20 @@ export const AddToCalendarDialog = ({
     onClose();
   };
 
+  const handleClose = async () => {
+    // Save preference if "Don't ask again" is checked even when cancelling
+    if (dontAskAgain) {
+      await setSetting('calendar_prompt_disabled', true);
+    }
+    onClose();
+  };
+
   if (!isAuthenticated) {
     return null;
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -94,8 +110,22 @@ export const AddToCalendarDialog = ({
           )}
         </div>
 
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id="dont-ask-again" 
+            checked={dontAskAgain}
+            onCheckedChange={(checked) => setDontAskAgain(checked === true)}
+          />
+          <label 
+            htmlFor="dont-ask-again" 
+            className="text-sm text-muted-foreground cursor-pointer"
+          >
+            {t('sync.dontAskAgain', "Don't ask me again")}
+          </label>
+        </div>
+
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             {t('common.cancel')}
           </Button>
           <Button onClick={handleAddToCalendar} disabled={isCreating}>
@@ -115,6 +145,12 @@ export const useCalendarEventPrompt = () => {
 
   const promptAddToCalendar = async (task: TodoItem) => {
     if (!isAuthenticated || !tokens?.accessToken || !task.dueDate) {
+      return false;
+    }
+
+    // Check if user disabled the prompt
+    const promptDisabled = await getSetting<boolean>('calendar_prompt_disabled', false);
+    if (promptDisabled) {
       return false;
     }
 

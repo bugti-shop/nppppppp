@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Confetti from 'react-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, CheckSquare, Mic, Unlock, Bell, Crown, Loader2 } from 'lucide-react';
+import { FileText, CheckSquare, Mic, Unlock, Bell, Crown, Loader2, CloudIcon } from 'lucide-react';
 import Welcome from '@/components/Welcome';
 import featureHome from '@/assets/feature-home.png';
 import featureNotes from '@/assets/feature-notes.png';
@@ -42,9 +42,11 @@ import featureSwipeDelete from '@/assets/feature-swipe-delete.png';
 import showcaseFolders from '@/assets/showcase-folders.png';
 import showcaseAvatars from '@/assets/showcase-avatars.png';
 import showcaseVoice from '@/assets/showcase-voice.png';
+import googleLogo from '@/assets/logo-google-drive.png';
 import { PRICING_DISPLAY } from '@/lib/billing';
 import { Capacitor } from '@capacitor/core';
 import { triggerHaptic } from '@/utils/haptics';
+import { useGoogleAuth } from '@/contexts/GoogleAuthContext';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -54,6 +56,7 @@ export default function OnboardingFlow({
   onComplete
 }: OnboardingFlowProps) {
   const { t } = useTranslation();
+  const { signIn, isAuthenticated, user, isLoading: isGoogleLoading } = useGoogleAuth();
   const [showWelcome, setShowWelcome] = useState(true);
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState('');
@@ -75,6 +78,7 @@ export default function OnboardingFlow({
   const [showcaseView, setShowcaseView] = useState<0 | 1 | 2>(0);
   const [offerings, setOfferings] = useState<any>(null);
   const [isLoadingOfferings, setIsLoadingOfferings] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const expenseTouchStartX = useRef<number>(0);
@@ -165,8 +169,8 @@ export default function OnboardingFlow({
     logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/LinkedIn_icon.svg/2048px-LinkedIn_icon.svg.png'
   }];
 
-  // Steps: 1 (goal) -> 2-15 (note features) -> 16 (task input) -> 17 (showcase) -> 18-30 (task features) -> 31 (testimonials) -> 32 (source) -> 33 (loading)
-  const totalSteps = 33;
+  // Steps: 1 (goal) -> 2-15 (note features) -> 16 (task input) -> 17 (showcase) -> 18-30 (task features) -> 31 (testimonials) -> 32 (source) -> 33 (google sign in) -> 34 (loading)
+  const totalSteps = 34;
 
   // Showcase features data
   const showcaseFeatures = [
@@ -223,7 +227,7 @@ export default function OnboardingFlow({
   }, [step, offerings, fetchOfferings]);
 
   useEffect(() => {
-    if (step === 33) {
+    if (step === 34) {
       const timer = setInterval(() => {
         setProgress(prev => {
           if (prev >= 100) {
@@ -244,10 +248,28 @@ export default function OnboardingFlow({
 
   const handleContinue = () => {
     triggerHaptic('heavy');
-    if (step < 33) {
+    if (step < 34) {
       setSwipeDirection('left');
       setStep(step + 1);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      await signIn();
+      // After successful sign in, continue to next step
+      handleContinue();
+    } catch (error) {
+      console.error('Google sign in failed:', error);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleSkipGoogleSignIn = () => {
+    triggerHaptic('light');
+    handleContinue();
   };
 
   const handleBack = () => {
@@ -502,11 +524,8 @@ export default function OnboardingFlow({
             </div>
           ) : (
             <div className="flex gap-2 justify-center w-full">
-              {/* Weekly Option */}
+              {/* Weekly Option - No free trial */}
               <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center min-h-[70px] ${plan === 'weekly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap font-medium">
-                  {t('onboarding.paywall.daysFree', { days: weeklyTrialDays })}
-                </span>
                 <p className="font-bold text-sm">{t('onboarding.paywall.weekly', 'Weekly')}</p>
                 <p className="text-gray-600 text-xs mt-0.5">{weeklyPrice}</p>
               </button>
@@ -607,9 +626,11 @@ export default function OnboardingFlow({
                 className="w-80 mt-4 btn-duo disabled:opacity-50"
               >
                 {isPurchasing ? t('onboarding.paywall.processing') : (
-                  plan === 'monthly' ? 'Start My 3 Days Free Trial' : t('onboarding.paywall.startTrialButton', { 
-                    days: plan === 'yearly' ? PRICING_DISPLAY.yearly.trialDays : PRICING_DISPLAY.weekly.trialDays 
-                  })
+                  plan === 'weekly' 
+                    ? t('onboarding.paywall.continueWithPrice', { price: '$2.99' })
+                    : plan === 'monthly' 
+                      ? 'Start My 3 Days Free Trial' 
+                      : t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.yearly.trialDays })
                 )}
               </button>
 
@@ -1724,6 +1745,70 @@ export default function OnboardingFlow({
         )}
 
         {step === 33 && (
+          <motion.section 
+            key="step33"
+            custom={swipeDirection}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="mt-8 text-center flex flex-col items-center"
+          >
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+              <CloudIcon className="w-10 h-10 text-primary" />
+            </div>
+            
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('onboarding.googleSync.title', 'Sync Your Data')}</h1>
+            <p className="text-gray-500 text-sm mb-8 max-w-xs">
+              {t('onboarding.googleSync.subtitle', 'Sign in with Google to sync your notes, tasks, and folders across all your devices.')}
+            </p>
+
+            {isAuthenticated && user ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                  {user.imageUrl && (
+                    <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                  )}
+                  <div className="text-left">
+                    <p className="font-medium text-green-800">{t('onboarding.googleSync.signedInAs', 'Signed in as')}</p>
+                    <p className="text-sm text-green-600">{user.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleContinue}
+                  className="w-72 btn-duo"
+                >
+                  {t('onboarding.continue')}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn || isGoogleLoading}
+                  className="w-72 flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-6 font-medium text-gray-800 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {isSigningIn || isGoogleLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <img src={googleLogo} alt="Google" className="w-6 h-6" />
+                  )}
+                  {isSigningIn ? t('common.loading') : t('onboarding.googleSync.continueWithGoogle', 'Continue with Google')}
+                </button>
+                
+                <button
+                  onClick={handleSkipGoogleSignIn}
+                  className="text-gray-400 text-sm underline"
+                >
+                  {t('onboarding.googleSync.skip', 'Skip for now')}
+                </button>
+              </div>
+            )}
+          </motion.section>
+        )}
+
+        {step === 34 && (
           <section className="mt-20 text-center">
             <h1 className="text-5xl font-bold mb-4">{progress}%</h1>
             <p className="text-lg font-semibold mb-4">{t('onboarding.loading.settingUp')}</p>
@@ -1757,7 +1842,7 @@ export default function OnboardingFlow({
       </div>
 
       <div className="mt-8 space-y-4">
-        {step !== 33 && (
+        {step !== 33 && step !== 34 && (
           <button
             onClick={handleContinue}
             className="w-full btn-duo"

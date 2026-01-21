@@ -538,7 +538,8 @@
     "importTasks": "Import Tasks",
     "importTasksDesc": "Bring your tasks from other productivity apps",
     "continueAccount": "Continue {{service}} Account",
-    "importFrom": "Import from {{service}}"
+    "importFrom": "Import from {{service}}",
+    "dontAskAgain": "Don't ask me again"
   },
   "accessibility": {
     "goToPreviousPage": "Go to previous page",
@@ -961,6 +962,7 @@
       "trialThen": "{{days}} days free, then {{price}} per year ({{monthlyEquivalent}})",
       "startTrialButton": "Start My {{days}}-Day Free Trial",
       "startTrialButtonMonthly": "Start My Free Trial",
+      "continueWithPrice": "Continue With {{price}}",
       "processing": "Processing...",
       "restorePurchase": "Restore Purchase",
       "restoring": "Restoring...",
@@ -973,6 +975,13 @@
       "purchaseFailed": "Purchase failed. Please try again.",
       "noPurchasesFound": "No previous purchases found",
       "restoreFailed": "Failed to restore purchases"
+    },
+    "googleSync": {
+      "title": "Sync Your Data",
+      "subtitle": "Sign in with Google to sync your notes, tasks, and folders across all your devices.",
+      "signedInAs": "Signed in as",
+      "continueWithGoogle": "Continue with Google",
+      "skip": "Skip for now"
     }
   },
   "toast": {
