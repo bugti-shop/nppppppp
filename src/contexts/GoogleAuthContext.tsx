@@ -162,8 +162,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         authUrl.searchParams.set('response_type', 'token');
         authUrl.searchParams.set('scope', SCOPES);
         authUrl.searchParams.set('state', state);
-        authUrl.searchParams.set('access_type', 'offline');
-        authUrl.searchParams.set('prompt', 'consent');
+        authUrl.searchParams.set('prompt', 'select_account');
 
         // Open OAuth popup
         const popup = window.open(authUrl.toString(), 'google-auth', 'width=500,height=600');
