@@ -1081,7 +1081,7 @@ export const RichTextEditor = ({
     }
   };
 
-  const handleTextCase = (caseType: 'upper' | 'lower') => {
+  const handleTextCase = (caseType: 'upper' | 'lower' | 'capitalize') => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       toast.error('Please select text first');
@@ -1094,12 +1094,22 @@ export const RichTextEditor = ({
       return;
     }
 
-    const convertedText = caseType === 'upper'
-      ? selectedText.toUpperCase()
-      : selectedText.toLowerCase();
+    let convertedText: string;
+    if (caseType === 'upper') {
+      convertedText = selectedText.toUpperCase();
+    } else if (caseType === 'lower') {
+      convertedText = selectedText.toLowerCase();
+    } else {
+      // Capitalize first letter of each word
+      convertedText = selectedText.replace(/\b\w/g, char => char.toUpperCase());
+    }
 
     document.execCommand('insertText', false, convertedText);
-    toast.success(`Text converted to ${caseType === 'upper' ? 'uppercase' : 'lowercase'}`);
+    toast.success(
+      caseType === 'upper' ? 'Text converted to uppercase' : 
+      caseType === 'lower' ? 'Text converted to lowercase' : 
+      'First letter of each word capitalized'
+    );
   };
 
   const handleAlignment = (alignment: 'left' | 'center' | 'right' | 'justify') => {

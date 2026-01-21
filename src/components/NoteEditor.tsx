@@ -656,12 +656,12 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Plus icon with insert dropdown - Google Docs style */}
+            {/* More options dropdown */}
             {(noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className={cn("h-9 w-9", noteType === 'sticky' && "text-black hover:text-black")}>
-                    <Plus className="h-5 w-5" />
+                    <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-card z-50">
