@@ -10,9 +10,9 @@ export const ENTITLEMENT_ID = 'npd Pro';
 export const BILLING_CONFIG = {
   // Weekly Subscription
   weekly: {
-    productId: 'weekly', // RevenueCat package identifier
-    basePlanId: 'npd-weekly',
-    offerId: 'npd-weekly-offer',
+    productId: 'npd_wk', // RevenueCat package identifier
+    basePlanId: 'npd-wk-plan',
+    offerId: 'npd-wk-trial',
   },
   
   // Monthly Subscription
