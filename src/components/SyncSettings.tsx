@@ -225,13 +225,7 @@ const SyncSettings = () => {
     });
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Removed loading state to prevent showing spinner while auth state loads
 
   const connectButtonStyles = "w-full h-12 justify-start gap-3 border border-border bg-background hover:bg-muted/50 text-foreground font-medium rounded-xl";
 
