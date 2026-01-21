@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WelcomeProvider, useWelcome } from "@/contexts/WelcomeContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
+import { GoogleAuthProvider } from "@/contexts/GoogleAuthContext";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import Index from "./pages/Index";
@@ -25,6 +26,7 @@ import CustomToolDetail from "./pages/todo/CustomToolDetail";
 import WeeklyReview from "./pages/todo/WeeklyReview";
 import WidgetsDashboard from "./pages/todo/WidgetsDashboard";
 import TaskHistory from "./pages/todo/TaskHistory";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import { NavigationBackProvider } from "@/components/NavigationBackProvider";
 import { notificationManager } from "@/utils/notifications";
@@ -107,6 +109,7 @@ const AppRoutes = () => {
           <Route path="/todo/weekly-review" element={<WeeklyReview />} />
           <Route path="/todo/dashboard" element={<WidgetsDashboard />} />
           <Route path="/todo/history" element={<TaskHistory />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </NavigationBackProvider>
@@ -139,11 +142,13 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <RevenueCatProvider>
-          <WelcomeProvider>
-            <SubscriptionProvider>
-              <AppContent />
-            </SubscriptionProvider>
-          </WelcomeProvider>
+          <GoogleAuthProvider>
+            <WelcomeProvider>
+              <SubscriptionProvider>
+                <AppContent />
+              </SubscriptionProvider>
+            </WelcomeProvider>
+          </GoogleAuthProvider>
         </RevenueCatProvider>
       </TooltipProvider>
     </QueryClientProvider>
