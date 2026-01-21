@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { TodoItem, TaskSection } from '@/types/note';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { cn } from '@/lib/utils';
@@ -22,9 +23,10 @@ interface UnifiedDragDropListProps {
 
 const LONG_PRESS_DELAY = 150; // Reduced for faster response
 
-// Initial visible items - can load more
-const INITIAL_VISIBLE_ITEMS = 30;
-const LOAD_MORE_INCREMENT = 30;
+// Increased limits for better initial experience
+const INITIAL_VISIBLE_ITEMS = 50;
+const LOAD_MORE_INCREMENT = 50;
+const VIRTUALIZATION_THRESHOLD = 100; // Use virtualization above this count
 
 interface DragItem {
   id: string;
@@ -41,6 +43,178 @@ interface DropTarget {
   insertIndex?: number;
   indicatorY?: number; // Track indicator position
 }
+
+// Memoized task row component for virtualization
+const MemoizedTaskRow = memo(({
+  item,
+  isDragging,
+  isSubtaskDropTarget,
+  hasSubtasks,
+  isExpanded,
+  subtasks,
+  draggedItemId,
+  draggedItemType,
+  setItemRef,
+  handleTouchStart,
+  renderTask,
+  renderSubtask,
+}: {
+  item: TodoItem;
+  isDragging: boolean;
+  isSubtaskDropTarget: boolean;
+  hasSubtasks: boolean;
+  isExpanded: boolean;
+  subtasks: TodoItem[];
+  draggedItemId: string | null;
+  draggedItemType: string | null;
+  setItemRef: (id: string, ref: HTMLDivElement | null) => void;
+  handleTouchStart: (dragItem: DragItem, e: React.TouchEvent) => void;
+  renderTask: (item: TodoItem, isDragging: boolean, isDropTarget: boolean, parentId?: string) => React.ReactNode;
+  renderSubtask: (subtask: TodoItem, parentId: string, isDragging: boolean, isDropTarget: boolean) => React.ReactNode;
+}) => {
+  return (
+    <div>
+      <div
+        ref={(ref) => setItemRef(item.id, ref)}
+        className={cn(
+          "relative will-change-transform",
+          isDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
+        )}
+        onTouchStart={(e) => handleTouchStart({ id: item.id, type: 'task', sectionId: item.sectionId }, e)}
+      >
+        {renderTask(item, isDragging, isSubtaskDropTarget, undefined)}
+
+        {isSubtaskDropTarget && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 ring-2 ring-primary ring-inset bg-primary/10 rounded-lg">
+            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full shadow-sm">
+              Make subtask
+            </span>
+          </div>
+        )}
+      </div>
+
+      {hasSubtasks && isExpanded && (
+        <div className="ml-8 border-l-2 border-muted/50 bg-muted/10">
+          {subtasks.slice(0, 20).map((subtask) => {
+            const isSubtaskDragging = draggedItemId === subtask.id && draggedItemType === 'subtask';
+            
+            return (
+              <div
+                key={subtask.id}
+                ref={(ref) => setItemRef(subtask.id, ref)}
+                className={cn(
+                  "relative will-change-transform",
+                  isSubtaskDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
+                )}
+                onTouchStart={(e) => handleTouchStart({ id: subtask.id, type: 'subtask', parentId: item.id }, e)}
+              >
+                {renderSubtask(subtask, item.id, isSubtaskDragging, false)}
+              </div>
+            );
+          })}
+          {subtasks.length > 20 && (
+            <div className="py-2 px-4 text-xs text-muted-foreground text-center">
+              +{subtasks.length - 20} more subtasks (tap task to view all)
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+MemoizedTaskRow.displayName = 'MemoizedTaskRow';
+
+// Virtualized section content for large task lists
+const VirtualizedSectionContent = memo(({
+  tasks,
+  expandedTasks,
+  draggedItemId,
+  draggedItemType,
+  dropTargetTaskId,
+  setItemRef,
+  handleTouchStart,
+  renderTask,
+  renderSubtask,
+}: {
+  tasks: TodoItem[];
+  expandedTasks: Set<string>;
+  draggedItemId: string | null;
+  draggedItemType: string | null;
+  dropTargetTaskId: string | null;
+  setItemRef: (id: string, ref: HTMLDivElement | null) => void;
+  handleTouchStart: (dragItem: DragItem, e: React.TouchEvent) => void;
+  renderTask: (item: TodoItem, isDragging: boolean, isDropTarget: boolean, parentId?: string) => React.ReactNode;
+  renderSubtask: (subtask: TodoItem, parentId: string, isDragging: boolean, isDropTarget: boolean) => React.ReactNode;
+}) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: tasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 15, // Extra items for smooth scrolling
+    getItemKey: (index) => tasks[index]?.id || index.toString(),
+  });
+
+  return (
+    <div 
+      ref={parentRef} 
+      className="max-h-[500px] overflow-auto"
+      style={{ contain: 'strict' }}
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const item = tasks[virtualRow.index];
+          if (!item) return null;
+
+          const isDragging = draggedItemId === item.id && draggedItemType === 'task';
+          const isSubtaskDropTarget = dropTargetTaskId === item.id;
+          const hasSubtasks = item.subtasks && item.subtasks.length > 0;
+          const isExpanded = expandedTasks.has(item.id);
+
+          return (
+            <div
+              key={virtualRow.key}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <MemoizedTaskRow
+                item={item}
+                isDragging={isDragging}
+                isSubtaskDropTarget={isSubtaskDropTarget}
+                hasSubtasks={hasSubtasks}
+                isExpanded={isExpanded}
+                subtasks={item.subtasks || []}
+                draggedItemId={draggedItemId}
+                draggedItemType={draggedItemType}
+                setItemRef={setItemRef}
+                handleTouchStart={handleTouchStart}
+                renderTask={renderTask}
+                renderSubtask={renderSubtask}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+VirtualizedSectionContent.displayName = 'VirtualizedSectionContent';
 
 export const UnifiedDragDropList = ({
   sections,
@@ -569,7 +743,7 @@ export const UnifiedDragDropList = ({
             ref={(ref) => setSectionRef(section.id, ref)}
             className={cn(
               "rounded-xl overflow-hidden border border-border/30 relative",
-              isDropTargetSection && "ring-2 ring-blue-500 bg-blue-500/5"
+              isDropTargetSection && "ring-2 ring-primary bg-primary/5"
             )}
           >
             {renderSectionHeader(section, false)}
@@ -580,63 +754,42 @@ export const UnifiedDragDropList = ({
                 style={{ borderLeft: `4px solid ${section.color}` }}
               >
                 {sectionTasks.length > 0 ? (
-                  <div className="divide-y divide-border/30">
-                    {sectionTasks.map((item) => {
-                      const isDragging = dragState.draggedItem?.id === item.id && dragState.draggedItem?.type === 'task';
-                      const isSubtaskDropTarget = dragState.dropTarget?.type === 'subtask-area' && dragState.dropTarget.taskId === item.id;
-                      const hasSubtasks = item.subtasks && item.subtasks.length > 0;
-                      const isExpanded = expandedTasks.has(item.id);
-
-                      return (
-                        <div key={item.id}>
-                          <div
-                            ref={(ref) => setItemRef(item.id, ref)}
-                            className={cn(
-                              "relative will-change-transform",
-                              isDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
-                            )}
-                            onTouchStart={(e) => handleTouchStart({ id: item.id, type: 'task', sectionId: item.sectionId }, e)}
-                          >
-                            {renderTask(item, isDragging, isSubtaskDropTarget, undefined)}
-
-                            {isSubtaskDropTarget && (
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 ring-2 ring-blue-500 ring-inset bg-blue-500/10 rounded-lg">
-                                <span className="text-xs font-medium text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded-full shadow-sm">
-                                  Make subtask
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {hasSubtasks && isExpanded && (
-                            <div className="ml-8 border-l-2 border-muted/50 bg-muted/10">
-                              {item.subtasks!.slice(0, 20).map((subtask) => {
-                                const isSubtaskDragging = dragState.draggedItem?.id === subtask.id && dragState.draggedItem?.type === 'subtask';
-                                
-                                return (
-                                  <div
-                                    key={subtask.id}
-                                    ref={(ref) => setItemRef(subtask.id, ref)}
-                                    className={cn(
-                                      "relative will-change-transform",
-                                      isSubtaskDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
-                                    )}
-                                    onTouchStart={(e) => handleTouchStart({ id: subtask.id, type: 'subtask', parentId: item.id }, e)}
-                                  >
-                                    {renderSubtask(subtask, item.id, isSubtaskDragging, false)}
-                                  </div>
-                                );
-                              })}
-                              {item.subtasks!.length > 20 && (
-                                <div className="py-2 px-4 text-xs text-muted-foreground text-center">
-                                  +{item.subtasks!.length - 20} more subtasks (tap task to view all)
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <>
+                    {allSectionTasks.length > VIRTUALIZATION_THRESHOLD ? (
+                      // Use virtualization for large sections
+                      <VirtualizedSectionContent
+                        tasks={sectionTasks}
+                        expandedTasks={expandedTasks}
+                        draggedItemId={dragState.draggedItem?.id || null}
+                        draggedItemType={dragState.draggedItem?.type || null}
+                        dropTargetTaskId={dragState.dropTarget?.type === 'subtask-area' ? dragState.dropTarget.taskId || null : null}
+                        setItemRef={setItemRef}
+                        handleTouchStart={handleTouchStart}
+                        renderTask={renderTask}
+                        renderSubtask={renderSubtask}
+                      />
+                    ) : (
+                      // Standard rendering for small sections
+                      <div className="divide-y divide-border/30">
+                        {sectionTasks.map((item) => (
+                          <MemoizedTaskRow
+                            key={item.id}
+                            item={item}
+                            isDragging={dragState.draggedItem?.id === item.id && dragState.draggedItem?.type === 'task'}
+                            isSubtaskDropTarget={dragState.dropTarget?.type === 'subtask-area' && dragState.dropTarget.taskId === item.id}
+                            hasSubtasks={!!(item.subtasks && item.subtasks.length > 0)}
+                            isExpanded={expandedTasks.has(item.id)}
+                            subtasks={item.subtasks || []}
+                            draggedItemId={dragState.draggedItem?.id || null}
+                            draggedItemType={dragState.draggedItem?.type || null}
+                            setItemRef={setItemRef}
+                            handleTouchStart={handleTouchStart}
+                            renderTask={renderTask}
+                            renderSubtask={renderSubtask}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {/* Load More / Show Less buttons for large sections */}
                     {(hasMoreTasks || currentLimit > INITIAL_VISIBLE_ITEMS) && (
                       <div className="py-3 px-4 flex items-center justify-center gap-3 bg-muted/20">
@@ -664,7 +817,7 @@ export const UnifiedDragDropList = ({
                         )}
                       </div>
                     )}
-                  </div>
+                  </>
                 ) : (
                   renderEmptySection(section)
                 )}
