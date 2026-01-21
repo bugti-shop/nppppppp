@@ -61,7 +61,7 @@ export default function OnboardingFlow({
   const [progress, setProgress] = useState(0);
   const [complete, setComplete] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [plan, setPlan] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [adminCode, setAdminCode] = useState('');
@@ -450,15 +450,17 @@ export default function OnboardingFlow({
     const yearlyPkg = getYearlyPackage();
     
     // Hardcoded USD prices for display
+    const weeklyPrice = '$2.99/wk';
     const monthlyPrice = '$5.99/mo';
     const yearlyPrice = '$59.88';
     const yearlyMonthlyEquivalent = '$4.99/mo';
-    const trialDays = yearlyPkg?.product?.introPrice?.periodNumberOfUnits || PRICING_DISPLAY.yearly.trialDays;
+    const weeklyTrialDays = 1;
+    const yearlyTrialDays = yearlyPkg?.product?.introPrice?.periodNumberOfUnits || PRICING_DISPLAY.yearly.trialDays;
 
     return (
       <div className="min-h-screen bg-white p-6 flex flex-col justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-center mb-6">{t('onboarding.paywall.startTrial', { days: trialDays })}</h1>
+          <h1 className="text-3xl font-bold text-center mb-6">{t('onboarding.paywall.startTrial', { days: plan === 'weekly' ? weeklyTrialDays : yearlyTrialDays })}</h1>
           <div className="flex flex-col items-start mx-auto w-80 relative">
             {/* Vertical connecting line */}
             <div className="absolute left-[10.5px] top-[20px] bottom-[20px] w-[11px] bg-primary/20 rounded-b-full"></div>
@@ -477,7 +479,7 @@ export default function OnboardingFlow({
                 <Bell size={16} className="text-primary-foreground" strokeWidth={2} />
               </div>
               <div>
-                <p className="font-semibold">{t('onboarding.paywall.reminderDay', { days: trialDays - 1 })}</p>
+                <p className="font-semibold">{t('onboarding.paywall.reminderDay', { days: (plan === 'weekly' ? weeklyTrialDays : yearlyTrialDays) - 1 })}</p>
                 <p className="text-gray-500 text-sm">{t('onboarding.paywall.reminderDesc')}</p>
               </div>
             </div>
@@ -486,8 +488,8 @@ export default function OnboardingFlow({
                 <Crown size={16} className="text-primary-foreground" strokeWidth={2} />
               </div>
               <div>
-                <p className="font-semibold">{t('onboarding.paywall.billingDay', { days: trialDays })}</p>
-                <p className="text-gray-500 text-sm">{t('onboarding.paywall.billingDesc', { days: trialDays })}</p>
+                <p className="font-semibold">{t('onboarding.paywall.billingDay', { days: plan === 'weekly' ? weeklyTrialDays : yearlyTrialDays })}</p>
+                <p className="text-gray-500 text-sm">{t('onboarding.paywall.billingDesc', { days: plan === 'weekly' ? weeklyTrialDays : yearlyTrialDays })}</p>
               </div>
             </div>
           </div>
@@ -499,15 +501,24 @@ export default function OnboardingFlow({
               <span className="ml-2 text-gray-500">{t('onboarding.paywall.loadingPrices')}</span>
             </div>
           ) : (
-            <div className="flex gap-3">
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border rounded-xl p-4 w-36 text-center ${plan === 'monthly' ? 'border-primary bg-gray-50' : 'border-gray-200'}`}>
+            <div className="flex gap-2 flex-wrap justify-center">
+              {/* Weekly Option - Featured */}
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-4 w-28 text-center relative flex flex-col items-center justify-center ${plan === 'weekly' ? 'border-primary' : 'border-gray-200'}`}>
+                <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-2 whitespace-nowrap">
+                  {t('onboarding.paywall.daysFree', { days: weeklyTrialDays })}
+                </span>
+                <p className="font-semibold text-center">{t('onboarding.paywall.weekly', 'Weekly')}</p>
+                <p className="text-gray-600 text-sm mt-1">{weeklyPrice}</p>
+              </button>
+
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border rounded-xl p-4 w-28 text-center ${plan === 'monthly' ? 'border-primary bg-gray-50' : 'border-gray-200'}`}>
                 <p className="font-semibold">{t('onboarding.paywall.monthly')}</p>
                 <p className="text-gray-600 text-sm">{monthlyPrice}</p>
               </button>
 
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-4 w-36 text-center relative flex flex-col items-center justify-center ${plan === 'yearly' ? 'border-primary' : 'border-gray-200'}`}>
-                <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-2 whitespace-nowrap">
-                  {t('onboarding.paywall.daysFree', { days: trialDays })}
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-4 w-28 text-center relative flex flex-col items-center justify-center ${plan === 'yearly' ? 'border-primary' : 'border-gray-200'}`}>
+                <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-2 whitespace-nowrap">
+                  {t('onboarding.paywall.daysFree', { days: yearlyTrialDays })}
                 </span>
                 <p className="font-semibold text-center">{t('onboarding.paywall.yearly')}</p>
                 <p className="text-gray-600 text-sm mt-1">{yearlyMonthlyEquivalent}</p>
@@ -518,7 +529,12 @@ export default function OnboardingFlow({
             <div className="flex flex-col items-center gap-2">
               {plan === 'yearly' && !isLoadingOfferings && (
                 <p className="text-gray-500 text-sm mt-2">
-                  {t('onboarding.paywall.trialThen', { days: trialDays, price: yearlyPrice, monthlyEquivalent: yearlyMonthlyEquivalent })}
+                  {t('onboarding.paywall.trialThen', { days: yearlyTrialDays, price: yearlyPrice, monthlyEquivalent: yearlyMonthlyEquivalent })}
+                </p>
+              )}
+              {plan === 'weekly' && !isLoadingOfferings && (
+                <p className="text-gray-500 text-sm mt-2">
+                  {t('onboarding.paywall.trialThenWeekly', { days: weeklyTrialDays, price: weeklyPrice }) || `${weeklyTrialDays} day free, then ${weeklyPrice}`}
                 </p>
               )}
 
@@ -538,7 +554,11 @@ export default function OnboardingFlow({
                       }
                       
                       // Find the package based on selected plan
-                      const packageType = plan === 'monthly' ? PACKAGE_TYPE.MONTHLY : PACKAGE_TYPE.ANNUAL;
+                      const packageType = plan === 'monthly' 
+                        ? PACKAGE_TYPE.MONTHLY 
+                        : plan === 'weekly' 
+                          ? PACKAGE_TYPE.WEEKLY 
+                          : PACKAGE_TYPE.ANNUAL;
                       let pkg = offerings.current.availablePackages.find(
                         p => p.packageType === packageType
                       );
@@ -584,7 +604,13 @@ export default function OnboardingFlow({
                 disabled={isPurchasing}
                 className="w-80 mt-4 btn-duo disabled:opacity-50"
               >
-                {isPurchasing ? t('onboarding.paywall.processing') : (plan === 'yearly' ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.yearly.trialDays }) : t('onboarding.paywall.startTrialButtonMonthly'))}
+                {isPurchasing ? t('onboarding.paywall.processing') : (
+                  plan === 'yearly' 
+                    ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.yearly.trialDays }) 
+                    : plan === 'weekly'
+                      ? t('onboarding.paywall.startTrialButton', { days: PRICING_DISPLAY.weekly.trialDays })
+                      : t('onboarding.paywall.startTrialButtonMonthly')
+                )}
               </button>
 
               {/* Restore Purchase Button */}

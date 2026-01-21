@@ -44,6 +44,58 @@ interface DropTarget {
   indicatorY?: number; // Track indicator position
 }
 
+// Infinite scroll trigger component using IntersectionObserver
+const InfiniteScrollTrigger = memo(({ 
+  onVisible, 
+  hiddenCount, 
+  loadMoreIncrement 
+}: { 
+  onVisible: () => void; 
+  hiddenCount: number; 
+  loadMoreIncrement: number;
+}) => {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const hasTriggeredRef = useRef(false);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !hasTriggeredRef.current) {
+          hasTriggeredRef.current = true;
+          onVisible();
+          // Reset after a short delay to allow multiple loads
+          setTimeout(() => {
+            hasTriggeredRef.current = false;
+          }, 500);
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '100px' // Trigger 100px before element is visible
+      }
+    );
+    
+    if (triggerRef.current) {
+      observer.observe(triggerRef.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [onVisible]);
+  
+  return (
+    <div 
+      ref={triggerRef}
+      className="py-3 px-4 flex items-center justify-center bg-muted/20"
+    >
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin" />
+        <span>Loading {Math.min(hiddenCount, loadMoreIncrement)} more ({hiddenCount} remaining)</span>
+      </div>
+    </div>
+  );
+});
+
 // Memoized task row component for virtualization
 const MemoizedTaskRow = memo(({
   item,
@@ -686,6 +738,18 @@ export const UnifiedDragDropList = ({
 
   // Get current drag state for rendering
   const dragState = dragStateRef.current;
+  
+  // Calculate total and visible task counts
+  const totalTaskCount = items.filter(item => !item.completed).length;
+  const visibleTaskCount = sortedSections.reduce((count, section) => {
+    const currentLimit = expandedSectionLimits[section.id] || INITIAL_VISIBLE_ITEMS;
+    const sectionTaskCount = items.filter(item => 
+      !item.completed && (item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
+    ).length;
+    return count + Math.min(sectionTaskCount, currentLimit);
+  }, 0);
+  
+  const isVirtualizing = totalTaskCount > VIRTUALIZATION_THRESHOLD;
 
   return (
     <div 
@@ -700,6 +764,18 @@ export const UnifiedDragDropList = ({
         WebkitUserSelect: 'none',
       }}
     >
+      {/* Task Count Indicator - shows when virtualization is active */}
+      {isVirtualizing && (
+        <div className="sticky top-0 z-10 flex items-center justify-center py-2">
+          <div className="bg-primary/10 text-primary text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-2">
+            <span>Showing {visibleTaskCount} of {totalTaskCount} tasks</span>
+            {visibleTaskCount < totalTaskCount && (
+              <span className="text-primary/70">• Scroll to load more</span>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Global drop indicator - follows dragged item */}
       <div 
         ref={indicatorRef}
@@ -790,31 +866,25 @@ export const UnifiedDragDropList = ({
                         ))}
                       </div>
                     )}
-                    {/* Load More / Show Less buttons for large sections */}
-                    {(hasMoreTasks || currentLimit > INITIAL_VISIBLE_ITEMS) && (
-                      <div className="py-3 px-4 flex items-center justify-center gap-3 bg-muted/20">
-                        {hasMoreTasks && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={handleLoadMore}
-                            className="text-xs gap-1"
-                          >
-                            <ChevronDown className="h-3 w-3" />
-                            Load {Math.min(hiddenCount, LOAD_MORE_INCREMENT)} more ({hiddenCount} remaining)
-                          </Button>
-                        )}
-                        {currentLimit > INITIAL_VISIBLE_ITEMS && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={handleShowLess}
-                            className="text-xs gap-1 text-muted-foreground"
-                          >
-                            <ChevronUp className="h-3 w-3" />
-                            Show less
-                          </Button>
-                        )}
+                    {/* Infinite scroll trigger + Load More buttons */}
+                    {hasMoreTasks && (
+                      <InfiniteScrollTrigger 
+                        onVisible={handleLoadMore}
+                        hiddenCount={hiddenCount}
+                        loadMoreIncrement={LOAD_MORE_INCREMENT}
+                      />
+                    )}
+                    {currentLimit > INITIAL_VISIBLE_ITEMS && !hasMoreTasks && (
+                      <div className="py-3 px-4 flex items-center justify-center bg-muted/20">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleShowLess}
+                          className="text-xs gap-1 text-muted-foreground"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                          Show less
+                        </Button>
                       </div>
                     )}
                   </>
