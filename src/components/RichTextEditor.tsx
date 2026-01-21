@@ -1500,6 +1500,53 @@ export const RichTextEditor = ({
     });
   }, []);
 
+  // Re-attach event listeners and styling to audio player containers after content loads
+  const reattachAudioListeners = useCallback(() => {
+    if (!editorRef.current) return;
+    
+    const audioContainers = editorRef.current.querySelectorAll('.audio-player-container');
+    audioContainers.forEach((container) => {
+      const containerEl = container as HTMLElement;
+      const audioEl = containerEl.querySelector('audio') as HTMLAudioElement;
+      
+      if (!audioEl) {
+        // If audio element is missing, try to recreate from data attributes
+        const audioSrc = containerEl.getAttribute('data-audio-src');
+        if (audioSrc) {
+          const newAudio = document.createElement('audio');
+          newAudio.controls = true;
+          newAudio.src = audioSrc;
+          newAudio.style.width = '100%';
+          newAudio.style.maxWidth = '400px';
+          newAudio.style.height = '54px';
+          containerEl.appendChild(newAudio);
+        }
+        return;
+      }
+      
+      // Ensure audio element has proper attributes
+      audioEl.controls = true;
+      audioEl.style.width = '100%';
+      audioEl.style.maxWidth = '400px';
+      audioEl.style.height = '54px';
+      
+      // Restore src from data attribute if missing
+      const dataSrc = containerEl.getAttribute('data-audio-src');
+      if (dataSrc && !audioEl.src) {
+        audioEl.src = dataSrc;
+      }
+      
+      // Ensure container styling
+      containerEl.style.margin = '12px 0';
+      containerEl.style.display = 'block';
+      containerEl.style.textAlign = 'center';
+      containerEl.style.background = 'rgba(0, 0, 0, 0.05)';
+      containerEl.style.borderRadius = '12px';
+      containerEl.style.padding = '12px';
+      containerEl.contentEditable = 'false';
+    });
+  }, []);
+
   // Set content when it changes from external source (not user input)
   // This prevents crashes on Android by avoiding innerHTML manipulation during typing
   useEffect(() => {
@@ -1519,21 +1566,23 @@ export const RichTextEditor = ({
       const isFocused = document.activeElement === editorRef.current;
       if (!isFocused) {
         editorRef.current.innerHTML = sanitizeHtml(content);
-        // Re-attach image and table listeners after content is loaded
+        // Re-attach image, table, and audio listeners after content is loaded
         setTimeout(() => {
           reattachImageListeners();
           reattachTableListeners();
+          reattachAudioListeners();
         }, 0);
       }
     }
-  }, [content, reattachImageListeners, reattachTableListeners]);
+  }, [content, reattachImageListeners, reattachTableListeners, reattachAudioListeners]);
 
-  // Initial mount - reattach image and table listeners
+  // Initial mount - reattach image, table, and audio listeners
   useEffect(() => {
     if (editorRef.current && content) {
       setTimeout(() => {
         reattachImageListeners();
         reattachTableListeners();
+        reattachAudioListeners();
       }, 100);
     }
   }, []);

@@ -602,6 +602,7 @@
     "linkNotes": "Link Notes",
     "font": "Font",
     "fontSize": "Font Size",
+    "globalFontSize": "Note Font Size",
     "fontColor": "Font Color",
     "highlight": "Highlight",
     "folder": "Folder",
