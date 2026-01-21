@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ExpenseEntry } from '@/types/note';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Trash2, Plus, Settings, TrendingUp, Download, RefreshCw, CalendarClock, Menu, ArrowLeft, CalendarIcon, PieChart, Filter, X, BarChart3, Bell, FileDown, ArrowUpRight, ArrowDownRight, Minus, Wallet, DollarSign, Users, Split, Check, Receipt, Camera, Image } from 'lucide-react';
+import { Trash2, Plus, Settings, TrendingUp, Download, RefreshCw, CalendarClock, Menu, ArrowLeft, CalendarIcon, PieChart, Filter, X, BarChart3, Bell, FileDown, ArrowUpRight, ArrowDownRight, Minus, Wallet, DollarSign, Users, Split, Check, Receipt, Camera, Image, CheckCircle2, Loader2 } from 'lucide-react';
 import { saveReceipt, getReceipt, deleteReceipt, compressImage } from '@/utils/receiptStorage';
 
 import { useHardwareBackButton } from '@/hooks/useHardwareBackButton';
@@ -1226,10 +1226,34 @@ export const ExpenseTrackerEditor = ({
   const filledEntriesCount = entries.filter(e => e.date && e.category && e.amount > 0).length;
   const enabledRecurringCount = recurringExpenses.filter(r => r.enabled).length;
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Track save status
+  useEffect(() => {
+    if (entries.length > 0 && initialized) {
+      setIsSaving(true);
+      const timer = setTimeout(() => {
+        setIsSaving(false);
+        setLastSaved(new Date());
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [entries, budgets, recurringExpenses, customCategories, customPaymentMethods, currency, spendingGoals, incomeEntries, splitParticipants, splitExpenses, budgetNotificationsEnabled, initialized]);
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Title and Hamburger Menu */}
       <div className="px-2 py-2 border-b bg-background flex items-center gap-2">
+        {/* Save Status Indicator */}
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          {isSaving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+          ) : lastSaved ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+          ) : null}
+        </div>
+        
         {/* Hamburger Menu - Using Drawer for instant appearance */}
         <Drawer>
           <DrawerTrigger asChild>

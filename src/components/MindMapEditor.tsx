@@ -8,7 +8,7 @@ import {
   Undo2, Redo2, Copy, Clipboard, CircleDot, Square,
   Triangle, Diamond, Hexagon, Star, Heart, LayoutGrid,
   FileText, Lightbulb, Target, BarChart3, GitBranch as BranchIcon,
-  TreeDeciduous, Circle, Network
+  TreeDeciduous, Circle, Network, CheckCircle2, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -116,9 +116,17 @@ export const MindMapEditor = ({ content, onChange, title, onTitleChange }: MindM
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<MindMapNode | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   useEffect(() => {
+    setIsSaving(true);
     onChange(JSON.stringify(data));
+    const timer = setTimeout(() => {
+      setIsSaving(false);
+      setLastSaved(new Date());
+    }, 300);
+    return () => clearTimeout(timer);
   }, [data, onChange]);
 
   const saveHistory = useCallback((newData: MindMapData) => {
@@ -519,12 +527,20 @@ export const MindMapEditor = ({ content, onChange, title, onTitleChange }: MindM
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Title */}
-      <div className="px-4 py-3 border-b">
+      <div className="px-4 py-3 border-b flex items-center gap-2">
+        {/* Save Status Indicator */}
+        <div className="flex items-center gap-1">
+          {isSaving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+          ) : lastSaved ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+          ) : null}
+        </div>
         <Input
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder="Mind Map Title"
-          className="text-xl font-bold border-0 px-0 focus-visible:ring-0"
+          className="text-xl font-bold border-0 px-0 focus-visible:ring-0 flex-1"
         />
       </div>
 
