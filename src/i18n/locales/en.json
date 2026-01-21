@@ -532,11 +532,11 @@
   },
   "sync": {
     "lastSynced": "Last synced: {{time}}",
-    "syncWithCalendar": "Sync tasks with Google Calendar",
+    "syncWithCalendar": "Keep your tasks in sync with Google Calendar",
     "integrations": "Integrations",
     "integrationsDesc": "Connect with ClickUp, Notion, and HubSpot",
     "importTasks": "Import Tasks",
-    "importTasksDesc": "Import tasks from other apps",
+    "importTasksDesc": "Bring your tasks from other productivity apps",
     "continueAccount": "Continue {{service}} Account",
     "importFrom": "Import from {{service}}"
   },

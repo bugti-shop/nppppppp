@@ -1,9 +1,8 @@
-import { Home, CalendarDays, Calendar, Settings, LayoutDashboard, History, BookOpen } from 'lucide-react';
+import { Home, Calendar, Settings, LayoutDashboard, History, BookOpen, MoreHorizontal } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/utils/haptics';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const triggerNavHaptic = async () => {
@@ -18,12 +17,12 @@ export const TodoBottomNavigation = () => {
     { icon: Home, label: t('nav.home'), path: '/todo/today' },
     { icon: Calendar, label: t('nav.calendar'), path: '/todo/calendar' },
     { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/todo/dashboard' },
+    { icon: Settings, label: t('nav.settings'), path: '/todo/settings' },
   ];
 
   const moreItems = [
     { icon: BookOpen, label: t('nav.weeklyReview'), path: '/todo/weekly-review' },
     { icon: History, label: t('nav.taskHistory'), path: '/todo/history' },
-    { icon: Settings, label: t('nav.settings'), path: '/todo/settings' },
   ];
 
   return (
@@ -35,7 +34,7 @@ export const TodoBottomNavigation = () => {
         transform: 'translateZ(0)',
       }}
     >
-      <div className="grid grid-cols-4 h-14 sm:h-16 max-w-screen-lg mx-auto">
+      <div className="grid grid-cols-5 h-14 sm:h-16 max-w-screen-lg mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -69,10 +68,10 @@ export const TodoBottomNavigation = () => {
               )}
             >
               <MoreHorizontal className="h-5 w-5 sm:h-5 sm:w-5 flex-shrink-0" />
-              <span className="text-[10px] sm:text-xs font-medium truncate max-w-full">More</span>
+              <span className="text-[10px] sm:text-xs font-medium truncate max-w-full">{t('nav.more')}</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="mb-2 w-48 bg-card">
+          <DropdownMenuContent align="end" className="mb-2 w-48">
             {moreItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
