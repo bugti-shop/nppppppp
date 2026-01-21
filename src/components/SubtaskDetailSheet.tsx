@@ -183,16 +183,20 @@ export const SubtaskDetailSheet = ({
     if (!newSubtaskText.trim()) return;
     try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
     
+    const now = new Date();
     const nested: TodoItem = {
       id: Date.now().toString(),
       text: newSubtaskText.trim(),
       completed: false,
+      createdAt: now,
+      modifiedAt: now,
     };
 
     onUpdate(parentId, subtask.id, {
       subtasks: [...(subtask.subtasks || []), nested]
     });
     setNewSubtaskText('');
+    // Keep input open for continuous adding
   };
 
   const handleSubtaskKeyDown = (e: React.KeyboardEvent) => {
@@ -345,29 +349,14 @@ export const SubtaskDetailSheet = ({
           {/* Nested Subtasks */}
           <div className="space-y-3">
             <button
-              onClick={() => setShowSubtaskInput(true)}
+              onClick={() => setIsNestedSubtaskInputOpen(true)}
               className="flex items-center gap-2 text-primary font-medium"
             >
               <Plus className="h-5 w-5" />
               Add Sub-task
             </button>
 
-            {showSubtaskInput && (
-              <div className="flex items-center gap-2 pl-7">
-                <Checkbox className="h-5 w-5 rounded-sm border-2" disabled />
-                <Input
-                  ref={subtaskInputRef}
-                  value={newSubtaskText}
-                  onChange={(e) => setNewSubtaskText(e.target.value)}
-                  onKeyDown={handleSubtaskKeyDown}
-                  placeholder="Type subtask and press Enter..."
-                  className="flex-1 h-9"
-                />
-                <Button variant="ghost" size="icon" onClick={() => setShowSubtaskInput(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            {/* Keep inline input as fallback if sheet fails */}
 
             {subtask.subtasks && subtask.subtasks.length > 0 && (
               <div className="space-y-2 pl-2">
