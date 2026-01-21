@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, StickyNote, FileText, FileEdit, Pen, ListTodo, Bell, Clock, Repeat, FileCode, GitBranch, Sun, Moon, Receipt, Star, ArrowUpDown, MoreVertical, FolderPlus, CheckSquare, Trash2, Archive, X, RotateCcw } from 'lucide-react';
+import { Search, Plus, StickyNote, FileText, FileEdit, Pen, ListTodo, Bell, Clock, Repeat, FileCode, GitBranch, Sun, Moon, Receipt, Star, ArrowUpDown, MoreVertical, FolderPlus, CheckSquare, Trash2, Archive, X, RotateCcw, Copy, Folder as FolderIcon } from 'lucide-react';
 import { getAllUpcomingReminders } from '@/utils/noteNotifications';
 import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +55,7 @@ const Index = () => {
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'notes' | 'trash' | 'archive'>('notes');
   const [isGridView, setIsGridView] = useState(false);
+  const [showBulkFolderSheet, setShowBulkFolderSheet] = useState(false);
   const { isOnline, isSyncing, hasError, lastSync } = useRealtimeSync();
   const syncEnabled = syncManager.isSyncEnabled();
 
@@ -489,6 +490,58 @@ const Index = () => {
     setIsSelectionMode(false);
   };
 
+  // New bulk operations
+  const handleBulkFavorite = () => {
+    setNotes(prev => {
+      const updatedNotes = prev.map(n =>
+        selectedNoteIds.includes(n.id)
+          ? { ...n, isFavorite: true }
+          : n
+      );
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
+    setSelectedNoteIds([]);
+    setIsSelectionMode(false);
+  };
+
+  const handleBulkDuplicate = () => {
+    setNotes(prev => {
+      const duplicates = selectedNoteIds
+        .map(id => prev.find(n => n.id === id))
+        .filter(Boolean)
+        .map(note => ({
+          ...note!,
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title: `${note!.title || 'Untitled'} (Copy)`,
+          isPinned: false,
+          pinnedOrder: undefined,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+      const updatedNotes = [...duplicates, ...prev];
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
+    setSelectedNoteIds([]);
+    setIsSelectionMode(false);
+  };
+
+  const handleBulkMoveToFolder = (folderId: string | null) => {
+    setNotes(prev => {
+      const updatedNotes = prev.map(n =>
+        selectedNoteIds.includes(n.id)
+          ? { ...n, folderId: folderId || undefined }
+          : n
+      );
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
+    setSelectedNoteIds([]);
+    setIsSelectionMode(false);
+    setShowBulkFolderSheet(false);
+  };
+
   const handleSelectAll = () => {
     setSelectedNoteIds(filteredNotes.map(n => n.id));
   };
@@ -674,21 +727,21 @@ const Index = () => {
 
         {/* Bulk Selection Mode Bar */}
         {isSelectionMode && (
-          <div className="sticky top-[120px] z-10 bg-primary text-primary-foreground p-3 rounded-lg mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleCancelSelection}
-              >
-                <X className="h-4 w-4 mr-1" />
-                {t('common.cancel')}
-              </Button>
-              <span className="text-sm font-medium">
-                {selectedNoteIds.length} {t('actions.selectedCount')}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="sticky top-[120px] z-10 bg-primary text-primary-foreground p-3 rounded-lg mb-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCancelSelection}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  {t('common.cancel')}
+                </Button>
+                <span className="text-sm font-medium">
+                  {selectedNoteIds.length} {t('actions.selectedCount')}
+                </span>
+              </div>
               <Button
                 size="sm"
                 variant="secondary"
@@ -696,20 +749,87 @@ const Index = () => {
               >
                 {t('common.selectAll')}
               </Button>
+            </div>
+            
+            {/* Action buttons row */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+              {/* Move to Folder */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={selectedNoteIds.length === 0}
+                    className="shrink-0"
+                  >
+                    <FolderIcon className="h-4 w-4 mr-1" />
+                    Move
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem onClick={() => handleBulkMoveToFolder(null)}>
+                    <FolderIcon className="h-4 w-4 mr-2" />
+                    All Notes (No Folder)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {folders.map((folder) => (
+                    <DropdownMenuItem 
+                      key={folder.id} 
+                      onClick={() => handleBulkMoveToFolder(folder.id)}
+                    >
+                      <div 
+                        className="h-3 w-3 rounded-full mr-2" 
+                        style={{ backgroundColor: folder.color }} 
+                      />
+                      {folder.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Favorite */}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleBulkFavorite}
+                disabled={selectedNoteIds.length === 0}
+                className="shrink-0"
+              >
+                <Star className="h-4 w-4 mr-1" />
+                Favorite
+              </Button>
+              
+              {/* Duplicate */}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleBulkDuplicate}
+                disabled={selectedNoteIds.length === 0}
+                className="shrink-0"
+              >
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicate
+              </Button>
+              
+              {/* Archive */}
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={handleBulkArchive}
                 disabled={selectedNoteIds.length === 0}
+                className="shrink-0"
               >
                 <Archive className="h-4 w-4 mr-1" />
                 {t('notes.archive')}
               </Button>
+              
+              {/* Delete */}
               <Button
                 size="sm"
                 variant="destructive"
                 onClick={handleBulkDelete}
                 disabled={selectedNoteIds.length === 0}
+                className="shrink-0"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 {t('common.delete')}

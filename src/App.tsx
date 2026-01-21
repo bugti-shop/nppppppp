@@ -9,6 +9,7 @@ import { WelcomeProvider, useWelcome } from "@/contexts/WelcomeContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
 import OnboardingFlow from "@/components/OnboardingFlow";
+import { NavigationLoader } from "@/components/NavigationLoader";
 import Index from "./pages/Index";
 import Notes from "./pages/Notes";
 import NotesCalendar from "./pages/NotesCalendar";
@@ -88,6 +89,7 @@ const AppRoutes = () => {
   return (
     <BrowserRouter>
       <NavigationBackProvider>
+        <NavigationLoader />
         <DashboardTracker />
         <Routes>
           <Route path="/" element={<RootRedirect />} />
