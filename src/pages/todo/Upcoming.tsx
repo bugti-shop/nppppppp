@@ -15,6 +15,7 @@ import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { TaskItem } from '@/components/TaskItem';
 import { SmartListsDropdown, SmartListType, getSmartListFilter } from '@/components/SmartListsDropdown';
 import { LocationRemindersMap } from '@/components/LocationRemindersMap';
+import { AddToCalendarDialog, useCalendarEventPrompt } from '@/components/AddToCalendarDialog';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -58,6 +59,9 @@ const Upcoming = () => {
   const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
   const [isLocationMapOpen, setIsLocationMapOpen] = useState(false);
+  
+  // Calendar event prompt
+  const { showPrompt: showCalendarPrompt, pendingTask, promptAddToCalendar, closePrompt: closeCalendarPrompt } = useCalendarEventPrompt();
 
   const loadItems = useCallback(async () => {
     let loadedItems = await loadTodoItems();
@@ -128,6 +132,21 @@ const Upcoming = () => {
     setAllItems(updatedAllItems);
     await saveTodoItems(updatedAllItems);
     loadItems();
+    
+    // Prompt to add to Google Calendar if task has a due date
+    if (newItem.dueDate && !newItem.googleCalendarEventId) {
+      promptAddToCalendar(newItem);
+    }
+  };
+  
+  const handleCalendarEventCreated = (eventId: string) => {
+    if (pendingTask) {
+      setAllItems(prev => prev.map(item => 
+        item.id === pendingTask.id 
+          ? { ...item, googleCalendarEventId: eventId }
+          : item
+      ));
+    }
   };
 
   const updateItem = async (itemId: string, updates: Partial<TodoItem>) => {
@@ -611,6 +630,16 @@ const Upcoming = () => {
         onOpenChange={setIsLocationMapOpen}
         tasks={items}
       />
+      
+      {/* Add to Google Calendar Dialog */}
+      {pendingTask && (
+        <AddToCalendarDialog
+          isOpen={showCalendarPrompt}
+          onClose={closeCalendarPrompt}
+          task={pendingTask}
+          onEventCreated={handleCalendarEventCreated}
+        />
+      )}
     </TodoLayout>
   );
 };

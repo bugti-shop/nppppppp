@@ -14,6 +14,7 @@ import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { SmartListsDropdown, SmartListType, getSmartListFilter } from '@/components/SmartListsDropdown';
 import { LocationRemindersMap } from '@/components/LocationRemindersMap';
 import { TaskWidgets } from '@/components/TaskWidgets';
+import { AddToCalendarDialog, useCalendarEventPrompt } from '@/components/AddToCalendarDialog';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { isSameDay, format, addDays, addWeeks, addMonths } from 'date-fns';
 import { createNextRecurringTask } from '@/utils/recurringTasks';
@@ -68,6 +69,9 @@ const TodoCalendar = () => {
   const [showCompleted, setShowCompleted] = useState(true);
   const [isLocationMapOpen, setIsLocationMapOpen] = useState(false);
   const [showWidgets, setShowWidgets] = useState(true);
+  
+  // Calendar event prompt
+  const { showPrompt: showCalendarPrompt, pendingTask, promptAddToCalendar, closePrompt: closeCalendarPrompt } = useCalendarEventPrompt();
 
   const loadTasks = useCallback(async () => {
     let tasks = await loadTodoItems();
@@ -364,7 +368,9 @@ const TodoCalendar = () => {
       try { await notificationManager.scheduleTaskReminder(newItem); } catch (error) { console.error('Failed to schedule notification:', error); }
     }
     
-    if (await isGoogleCalendarEnabled() && newItem.dueDate) {
+    // Check if Google Calendar is enabled via the old utility
+    const calendarEnabled = await isGoogleCalendarEnabled();
+    if (calendarEnabled && newItem.dueDate) {
       const eventId = await createCalendarEvent(newItem);
       if (eventId) {
         newItem.googleCalendarEventId = eventId;
@@ -378,6 +384,21 @@ const TodoCalendar = () => {
     setItems(allItems);
     setTaskDates(allItems.filter(t => t.dueDate).map(t => new Date(t.dueDate!)));
     window.dispatchEvent(new Event('tasksUpdated'));
+    
+    // Also prompt via the new Google Auth dialog if not already synced
+    if (newItem.dueDate && !newItem.googleCalendarEventId) {
+      promptAddToCalendar(newItem);
+    }
+  };
+  
+  const handleCalendarEventCreated = (eventId: string) => {
+    if (pendingTask) {
+      setItems(prev => prev.map(item => 
+        item.id === pendingTask.id 
+          ? { ...item, googleCalendarEventId: eventId }
+          : item
+      ));
+    }
   };
 
   const handleCreateFolder = async (name: string, color: string) => {
@@ -802,6 +823,16 @@ const TodoCalendar = () => {
             await saveTodoItems(updatedItems);
             window.dispatchEvent(new Event('tasksUpdated'));
           }}
+        />
+      )}
+      
+      {/* Add to Google Calendar Dialog */}
+      {pendingTask && (
+        <AddToCalendarDialog
+          isOpen={showCalendarPrompt}
+          onClose={closeCalendarPrompt}
+          task={pendingTask}
+          onEventCreated={handleCalendarEventCreated}
         />
       )}
     </TodoLayout>
