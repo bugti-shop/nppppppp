@@ -220,22 +220,7 @@ export const FolderManager = ({
             className="w-52 bg-card z-50 max-h-[70vh] overflow-y-auto overscroll-contain"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
-            {/* Grid View Toggle */}
-            {onToggleGridView && (
-              <DropdownMenuItem onClick={onToggleGridView}>
-                {isGridView ? (
-                  <>
-                    <List className="h-4 w-4 mr-2" />
-                    {t('notesMenu.listView')}
-                  </>
-                ) : (
-                  <>
-                    <LayoutGrid className="h-4 w-4 mr-2" />
-                    {t('notesMenu.gridView')}
-                  </>
-                )}
-              </DropdownMenuItem>
-            )}
+            {/* Grid View Toggle - REMOVED per user request */}
             
             {/* Bulk Selection Mode */}
             {onEnterSelectionMode && (

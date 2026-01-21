@@ -61,6 +61,131 @@ const getPriorityBorderClass = (priority?: Priority) => {
   }
 };
 
+// Subtask component with nested subtask collapse support
+interface SubtaskWithNestedProps {
+  subtask: TodoItem;
+  parentId: string;
+  onUpdateSubtask?: (parentId: string, subtaskId: string, updates: Partial<TodoItem>) => void;
+  hasNestedSubtasks: boolean;
+}
+
+const SubtaskWithNested = ({ subtask, parentId, onUpdateSubtask, hasNestedSubtasks }: SubtaskWithNestedProps) => {
+  const [isNestedOpen, setIsNestedOpen] = useState(false);
+  
+  return (
+    <Collapsible open={isNestedOpen} onOpenChange={setIsNestedOpen}>
+      <div
+        className="flex items-center gap-3 py-2 px-2 border-l-4 hover:bg-muted/30 transition-colors"
+        style={{ borderLeftColor: getPriorityBorderColor(subtask.priority) }}
+      >
+        <Checkbox
+          checked={subtask.completed}
+          onCheckedChange={async (checked) => {
+            if (onUpdateSubtask) {
+              onUpdateSubtask(parentId, subtask.id, { completed: !!checked });
+            }
+            if (checked && !subtask.completed) {
+              try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "h-5 w-5 transition-all",
+            subtask.completed 
+              ? "rounded-sm border-0 bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
+              : cn("rounded-full border-2", getPriorityBorderClass(subtask.priority))
+          )}
+        />
+        <div className="flex-1 min-w-0">
+          <p className={cn(
+            "text-sm font-medium truncate",
+            subtask.completed && "text-muted-foreground line-through"
+          )}>
+            {subtask.text}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {subtask.dueDate && (
+              <span className="text-xs text-muted-foreground">
+                {new Date(subtask.dueDate).toLocaleDateString()}
+              </span>
+            )}
+            {subtask.coloredTags && subtask.coloredTags.length > 0 && (
+              <div className="flex items-center gap-1">
+                {subtask.coloredTags.slice(0, 2).map((tag) => (
+                  <span 
+                    key={tag.name}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
+                    style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                  >
+                    <Tag className="h-2.5 w-2.5" />
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {subtask.repeatType && subtask.repeatType !== 'none' && (
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-600">
+                <Repeat className="h-2.5 w-2.5" />
+              </span>
+            )}
+          </div>
+        </div>
+        {subtask.imageUrl && (
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-border flex-shrink-0">
+            <ResolvedTaskImage srcRef={subtask.imageUrl} alt="Subtask attachment" className="w-full h-full object-cover" />
+          </div>
+        )}
+        {hasNestedSubtasks && (
+          <CollapsibleTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsNestedOpen(!isNestedOpen); }}
+              className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+            >
+              {isNestedOpen ? (
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+        )}
+      </div>
+      
+      {/* Nested subtasks (sub-subtasks) */}
+      {hasNestedSubtasks && (
+        <CollapsibleContent>
+          <div className="ml-6 space-y-1 pt-1 border-l-2 border-muted-foreground/20">
+            {subtask.subtasks!.map((nested) => (
+              <div
+                key={nested.id}
+                className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/20 transition-colors"
+                style={{ borderLeftColor: getPriorityBorderColor(nested.priority), borderLeftWidth: '2px' }}
+              >
+                <Checkbox
+                  checked={nested.completed}
+                  className={cn(
+                    "h-4 w-4 transition-all",
+                    nested.completed 
+                      ? "rounded-sm border-0 bg-muted-foreground/30" 
+                      : cn("rounded-full border-2", getPriorityBorderClass(nested.priority))
+                  )}
+                  disabled
+                />
+                <span className={cn(
+                  "text-xs flex-1 truncate",
+                  nested.completed && "text-muted-foreground line-through"
+                )}>
+                  {nested.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CollapsibleContent>
+      )}
+    </Collapsible>
+  );
+};
+
 export const TaskItem = ({
   item,
   level = 0,
@@ -403,71 +528,18 @@ export const TaskItem = ({
         <CollapsibleContent>
           {hasSubtasks && (
             <div className="ml-4 space-y-1 pt-1">
-              {item.subtasks!.map((subtask) => (
-                <div
-                  key={subtask.id}
-                  className="flex items-center gap-3 py-2 px-2 border-l-4 hover:bg-muted/30 transition-colors"
-                  style={{ borderLeftColor: getPriorityBorderColor(subtask.priority) }}
-                >
-                  <Checkbox
-                    checked={subtask.completed}
-                    onCheckedChange={async (checked) => {
-                      if (onUpdateSubtask) {
-                        onUpdateSubtask(item.id, subtask.id, { completed: !!checked });
-                      }
-                      if (checked && !subtask.completed) {
-                        try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className={cn(
-                      "h-5 w-5 transition-all",
-                      subtask.completed 
-                        ? "rounded-sm border-0 bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
-                        : cn("rounded-full border-2", getPriorityBorderClass(subtask.priority))
-                    )}
+              {item.subtasks!.map((subtask) => {
+                const hasNestedSubtasks = subtask.subtasks && subtask.subtasks.length > 0;
+                return (
+                  <SubtaskWithNested
+                    key={subtask.id}
+                    subtask={subtask}
+                    parentId={item.id}
+                    onUpdateSubtask={onUpdateSubtask}
+                    hasNestedSubtasks={hasNestedSubtasks}
                   />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm font-medium truncate",
-                      subtask.completed && "text-muted-foreground line-through"
-                    )}>
-                      {subtask.text}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {subtask.dueDate && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(subtask.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
-                      {subtask.coloredTags && subtask.coloredTags.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          {subtask.coloredTags.slice(0, 2).map((tag) => (
-                            <span 
-                              key={tag.name}
-                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
-                              style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-                            >
-                              <Tag className="h-2.5 w-2.5" />
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {subtask.repeatType && subtask.repeatType !== 'none' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-600">
-                          <Repeat className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {subtask.imageUrl && (
-                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-border flex-shrink-0">
-                      <ResolvedTaskImage srcRef={subtask.imageUrl} alt="Subtask attachment" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               <p className="text-xs text-muted-foreground px-2 py-1">
                 {item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} completed
               </p>

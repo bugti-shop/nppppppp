@@ -79,9 +79,10 @@ interface WordToolbarProps {
   onAlignCenter: () => void;
   onAlignRight: () => void;
   onAlignJustify: () => void;
-  onTextCase: (caseType: 'upper' | 'lower') => void;
+  onTextCase: (caseType: 'upper' | 'lower' | 'capitalize') => void;
   onFontFamily?: (font: string) => void;
   onFontSize?: (size: string) => void;
+  onGlobalFontSizeChange?: (size: string) => void;
   onHeading: (level: 1 | 2 | 3 | 'p') => void;
   currentFontFamily?: string;
   currentFontSize?: string;
@@ -574,19 +575,15 @@ export const WordToolbar = ({
             <RemoveFormatting className="h-8 w-8 stroke-[2.5] text-foreground" />
           </ToolbarButton>
         )}
-        {onCodeBlock && (
-          <ToolbarButton onClick={onCodeBlock} title="Inline Code">
-            <Code className="h-8 w-8 stroke-[2.5] text-foreground" />
-          </ToolbarButton>
-        )}
         {onHorizontalRule && (
           <ToolbarButton onClick={onHorizontalRule} title="Insert Horizontal Rule">
             <Minus className="h-8 w-8 stroke-[2.5] text-foreground" />
           </ToolbarButton>
         )}
-        {onBlockquote && (
-          <ToolbarButton onClick={onBlockquote} title="Insert Blockquote">
-            <Quote className="h-8 w-8 stroke-[2.5] text-foreground" />
+        {/* Comment - moved near formatting */}
+        {onComment && (
+          <ToolbarButton onClick={onComment} title="Add Comment">
+            <MessageSquare className="h-8 w-8 stroke-[2.5] text-foreground" />
           </ToolbarButton>
         )}
 
@@ -817,7 +814,7 @@ export const WordToolbar = ({
               <CaseSensitive className="h-8 w-8 stroke-[2.5] text-foreground" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-32 p-1">
+          <PopoverContent className="w-40 p-1">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -835,6 +832,15 @@ export const WordToolbar = ({
             >
               <CaseLower className="h-5 w-5" />
               lowercase
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start gap-2"
+              onClick={() => onTextCase('capitalize')}
+            >
+              <Type className="h-5 w-5" />
+              Capitalize Words
             </Button>
           </PopoverContent>
         </Popover>
@@ -862,12 +868,6 @@ export const WordToolbar = ({
           </>
         )}
 
-        {/* Comment */}
-        {onComment && (
-          <ToolbarButton onClick={onComment} title="Add Comment">
-            <MessageSquare className="h-8 w-8 stroke-[2.5] text-foreground" />
-          </ToolbarButton>
-        )}
 
         {/* Link */}
         {onInsertLink && (
