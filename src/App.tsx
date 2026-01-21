@@ -60,28 +60,28 @@ const DashboardTracker = () => {
   return null;
 };
 
-// Root redirect component that checks last dashboard
+// Root redirect component that checks last dashboard - renders Index immediately to prevent freeze
 const RootRedirect = () => {
-  const [targetPath, setTargetPath] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [isChecked, setIsChecked] = useState(false);
   
   useEffect(() => {
     const checkLastDashboard = async () => {
-      const lastDashboard = await getSetting<string>('lastDashboard', 'notes');
-      setTargetPath(lastDashboard === 'todo' ? '/todo/today' : '/');
+      try {
+        const lastDashboard = await getSetting<string>('lastDashboard', 'notes');
+        if (lastDashboard === 'todo') {
+          navigate('/todo/today', { replace: true });
+        }
+      } catch (e) {
+        console.warn('Failed to check last dashboard:', e);
+      }
+      setIsChecked(true);
     };
     checkLastDashboard();
-  }, []);
+  }, [navigate]);
   
-  if (targetPath === null) {
-    // Show nothing while loading (instant)
-    return null;
-  }
-  
-  if (targetPath === '/') {
-    return <Index />;
-  }
-  
-  return <Navigate to={targetPath} replace />;
+  // Always render Index immediately to prevent blank screen/freeze
+  return <Index />;
 };
 
 const AppRoutes = () => {
