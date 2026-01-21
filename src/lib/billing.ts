@@ -8,6 +8,13 @@ export const ENTITLEMENT_ID = 'npd Pro';
 
 // Product identifiers - matches RevenueCat dashboard and store products
 export const BILLING_CONFIG = {
+  // Weekly Subscription
+  weekly: {
+    productId: 'weekly', // RevenueCat package identifier
+    basePlanId: 'npd-weekly',
+    offerId: 'npd-weekly-offer',
+  },
+  
   // Monthly Subscription
   monthly: {
     productId: 'monthly', // RevenueCat package identifier
@@ -38,6 +45,12 @@ export const getSubscriptionDetails = (plan: PlanType): SubscriptionProduct => {
 
 // Pricing display (for UI only - actual pricing comes from RevenueCat/Store)
 export const PRICING_DISPLAY = {
+  weekly: {
+    price: '$2.99',
+    period: 'week',
+    displayPrice: '$2.99/wk',
+    trialDays: 1,
+  },
   monthly: {
     price: '$4.99',
     period: 'month',
