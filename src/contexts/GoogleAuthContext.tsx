@@ -32,6 +32,7 @@ interface GoogleAuthContextType {
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
 
 const GOOGLE_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.calendars',
@@ -118,11 +119,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Native sign-in using Capacitor plugin
         const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
         
+        // Note: serverClientId is required for Android but not in TypeScript types
         await GoogleAuth.initialize({
           clientId: GOOGLE_CLIENT_ID,
           scopes: SCOPES.split(' '),
           grantOfflineAccess: true,
-        });
+          // serverClientId is set in capacitor.config.ts for Android
+        } as any);
 
         const result = await GoogleAuth.signIn();
         
