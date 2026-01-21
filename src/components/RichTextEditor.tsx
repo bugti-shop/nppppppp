@@ -33,6 +33,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { TableEditor, generateTableHTML, TableContextMenu, TableStyle } from './TableEditor';
 import { WordToolbar } from './WordToolbar';
 import { getSetting, setSetting } from '@/utils/settingsStorage';
+import { autoCalculate } from '@/utils/autoCalculator';
 
 // Favorites storage helpers
 const FAVORITES_KEY = 'note-font-favorites';
@@ -977,8 +978,56 @@ export const RichTextEditor = ({
     }
   };
 
-  // Handle keydown for auto-capitalization
+  // Handle keydown for auto-capitalization and auto-calculation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Auto-calculate when = is typed
+    if (e.key === '=' && editorRef.current) {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const textNode = range.startContainer;
+        if (textNode.nodeType === Node.TEXT_NODE) {
+          const text = textNode.textContent || '';
+          const cursorPos = range.startOffset;
+          // Get text before cursor including the = that will be typed
+          const textBeforeCursor = text.substring(0, cursorPos);
+          
+          // Schedule auto-calculation after the = is inserted
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            
+            const currentRange = sel.getRangeAt(0);
+            const currentTextNode = currentRange.startContainer;
+            if (currentTextNode.nodeType !== Node.TEXT_NODE) return;
+            
+            const currentText = currentTextNode.textContent || '';
+            const currentPos = currentRange.startOffset;
+            const textToCheck = currentText.substring(0, currentPos);
+            
+            // Try to calculate
+            const result = autoCalculate(textToCheck);
+            if (result !== null) {
+              // Insert the result after the = sign
+              const newText = currentText.substring(0, currentPos) + result + currentText.substring(currentPos);
+              currentTextNode.textContent = newText;
+              
+              // Move cursor after the result
+              const newRange = document.createRange();
+              newRange.setStart(currentTextNode, currentPos + result.length);
+              newRange.setEnd(currentTextNode, currentPos + result.length);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              
+              // Trigger input to save
+              handleInput();
+            }
+          }, 10);
+        }
+      }
+    }
+    
     // Auto-capitalize after sentence-ending punctuation followed by space
     if (e.key === ' ' && editorRef.current) {
       const selection = window.getSelection();
