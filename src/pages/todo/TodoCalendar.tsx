@@ -527,69 +527,7 @@ const TodoCalendar = () => {
   return (
     <TodoLayout title={t('calendar.title')}>
       <main className="container mx-auto px-4 py-6 pb-32">
-        <div className="max-w-md mx-auto space-y-6">
-          {/* Header with filters */}
-          <div className="flex items-center justify-between gap-2">
-            <Tabs value={filterType} onValueChange={(value) => setFilterType(value as 'all' | 'pending' | 'completed')} className="flex-1">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="all">{t('common.all')}</TabsTrigger>
-                <TabsTrigger value="pending">{t('tasks.incomplete')}</TabsTrigger>
-                <TabsTrigger value="completed">{t('tasks.completed')}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {/* Action bar */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <SmartListsDropdown 
-                items={items}
-                currentList={smartList} 
-                onSelectList={setSmartList} 
-              />
-              <Button variant="outline" size="sm" onClick={() => setIsFilterSheetOpen(true)} className="relative">
-                <Filter className="h-4 w-4" />
-                {activeFiltersCount > 0 && (
-                  <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {activeFiltersCount}
-                  </Badge>
-                )}
-              </Button>
-              {hasLocationTasks && (
-                <Button variant="outline" size="sm" onClick={() => setIsLocationMapOpen(true)}>
-                  <MapPin className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={showWidgets ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowWidgets(!showWidgets)}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={isSelectionMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setIsSelectionMode(!isSelectionMode);
-                  setSelectedTaskIds(new Set());
-                }}
-              >
-                <MousePointer2 className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowCompleted(!showCompleted)}>
-                {showCompleted ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Task Widgets */}
-          {showWidgets && (
-            <TaskWidgets tasks={items} compact />
-          )}
-
+        <div className="max-w-md mx-auto space-y-4">
           {/* Selection mode actions */}
           {isSelectionMode && (
             <div className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">

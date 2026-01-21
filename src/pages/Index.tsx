@@ -481,7 +481,7 @@ const Index = () => {
   });
 
   return (
-    <div className="min-h-screen min-h-screen-dynamic bg-background pb-20 sm:pb-24 animate-fade-in">
+    <div className="min-h-screen min-h-screen-dynamic bg-background pb-20 sm:pb-24">
       <header 
         className="border-b sticky top-0 bg-background z-10"
         style={{

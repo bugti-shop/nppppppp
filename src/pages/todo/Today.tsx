@@ -368,7 +368,14 @@ const Today = () => {
   };
 
   const handleSaveSection = (updatedSection: TaskSection) => {
-    setSections(sections.map(s => s.id === updatedSection.id ? updatedSection : s));
+    setSections(prev => {
+      const exists = prev.some(s => s.id === updatedSection.id);
+      if (exists) {
+        return prev.map(s => s.id === updatedSection.id ? updatedSection : s);
+      }
+      // Section was just created, it's already in the list
+      return prev.map(s => s.id === updatedSection.id ? updatedSection : s);
+    });
   };
 
   const handleDeleteSection = (sectionId: string) => {
