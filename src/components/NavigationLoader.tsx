@@ -71,12 +71,7 @@ export const NavigationLoader = () => {
         style={{ width: `${progress}%` }}
       />
       
-      {/* Optional: Full screen overlay with spinner for longer loads */}
-      {isLoading && progress < 100 && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
-      )}
+      {/* Removed spinner overlay - only progress bar remains */}
     </div>
   );
 };
