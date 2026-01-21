@@ -501,32 +501,32 @@ export default function OnboardingFlow({
               <span className="ml-2 text-gray-500">{t('onboarding.paywall.loadingPrices')}</span>
             </div>
           ) : (
-            <div className="flex gap-3 justify-center w-full">
+            <div className="flex gap-2 justify-center w-full">
               {/* Weekly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-5 flex-1 text-center relative flex flex-col items-center justify-center min-h-[100px] ${plan === 'weekly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-xs px-2.5 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-3 whitespace-nowrap font-medium">
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('weekly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center min-h-[70px] ${plan === 'weekly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap font-medium">
                   {t('onboarding.paywall.daysFree', { days: weeklyTrialDays })}
                 </span>
-                <p className="font-bold text-lg">{t('onboarding.paywall.weekly', 'Weekly')}</p>
-                <p className="text-gray-600 text-base mt-1">{weeklyPrice}</p>
+                <p className="font-bold text-sm">{t('onboarding.paywall.weekly', 'Weekly')}</p>
+                <p className="text-gray-600 text-xs mt-0.5">{weeklyPrice}</p>
               </button>
 
               {/* Monthly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border-2 rounded-xl p-5 flex-1 text-center relative flex flex-col items-center justify-center min-h-[100px] ${plan === 'monthly' ? 'border-[#3c78f0] bg-gray-50' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-xs px-2.5 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-3 whitespace-nowrap font-medium">
-                  {t('onboarding.paywall.freeTrial', '3 Days Free Trial')}
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('monthly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center min-h-[70px] ${plan === 'monthly' ? 'border-[#3c78f0] bg-gray-50' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap font-medium">
+                  3 DAYS FREE
                 </span>
-                <p className="font-bold text-lg">{t('onboarding.paywall.monthly')}</p>
-                <p className="text-gray-600 text-base mt-1">{monthlyPrice}</p>
+                <p className="font-bold text-sm">{t('onboarding.paywall.monthly')}</p>
+                <p className="text-gray-600 text-xs mt-0.5">{monthlyPrice}</p>
               </button>
 
               {/* Yearly Option */}
-              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-5 flex-1 text-center relative flex flex-col items-center justify-center min-h-[100px] ${plan === 'yearly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
-                <span className="bg-[#3c78f0] text-white text-xs px-2.5 py-1 rounded-full absolute left-1/2 -translate-x-1/2 -top-3 whitespace-nowrap font-medium">
+              <button onClick={() => { triggerHaptic('heavy'); setPlan('yearly'); }} className={`border-2 rounded-xl p-3 flex-1 text-center relative flex flex-col items-center justify-center min-h-[70px] ${plan === 'yearly' ? 'border-[#3c78f0]' : 'border-gray-200'}`}>
+                <span className="bg-[#3c78f0] text-white text-[10px] px-2 py-0.5 rounded-full absolute left-1/2 -translate-x-1/2 -top-2.5 whitespace-nowrap font-medium">
                   {t('onboarding.paywall.daysFree', { days: yearlyTrialDays })}
                 </span>
-                <p className="font-bold text-lg">{t('onboarding.paywall.yearly')}</p>
-                <p className="text-gray-600 text-base mt-1">{yearlyMonthlyEquivalent}</p>
+                <p className="font-bold text-sm">{t('onboarding.paywall.yearly')}</p>
+                <p className="text-gray-600 text-xs mt-0.5">{yearlyMonthlyEquivalent}</p>
               </button>
             </div>
           )}
@@ -579,13 +579,15 @@ export default function OnboardingFlow({
                       const hasEntitlement = result.customerInfo.entitlements.active['npd Pro'] !== undefined;
                       
                       if (hasEntitlement) {
-                        localStorage.setItem('npd_pro_access', 'true');
-                        localStorage.setItem('npd_trial_start', new Date().toISOString());
+                        const { setSetting } = await import('@/utils/settingsStorage');
+                        await setSetting('npd_pro_access', true);
+                        await setSetting('npd_trial_start', new Date().toISOString());
                         onComplete();
                       }
                     } else {
                       // Web fallback - just complete for testing
-                      localStorage.setItem('npd_trial_start', new Date().toISOString());
+                      const { setSetting } = await import('@/utils/settingsStorage');
+                      await setSetting('npd_trial_start', new Date().toISOString());
                       onComplete();
                     }
                   } catch (error: any) {
@@ -605,8 +607,8 @@ export default function OnboardingFlow({
                 className="w-80 mt-4 btn-duo disabled:opacity-50"
               >
                 {isPurchasing ? t('onboarding.paywall.processing') : (
-                  t('onboarding.paywall.startTrialButton', { 
-                    days: plan === 'monthly' ? 3 : plan === 'yearly' ? PRICING_DISPLAY.yearly.trialDays : PRICING_DISPLAY.weekly.trialDays 
+                  plan === 'monthly' ? 'Start My 3 Days Free Trial' : t('onboarding.paywall.startTrialButton', { 
+                    days: plan === 'yearly' ? PRICING_DISPLAY.yearly.trialDays : PRICING_DISPLAY.weekly.trialDays 
                   })
                 )}
               </button>
@@ -621,15 +623,17 @@ export default function OnboardingFlow({
                       const { customerInfo } = await Purchases.restorePurchases();
                       const hasEntitlement = customerInfo.entitlements.active['npd Pro'] !== undefined;
                       if (hasEntitlement) {
-                        localStorage.setItem('npd_pro_access', 'true');
+                        const { setSetting } = await import('@/utils/settingsStorage');
+                        await setSetting('npd_pro_access', true);
                         onComplete();
                       } else {
                         setAdminError(t('onboarding.paywall.noPurchasesFound'));
                         setTimeout(() => setAdminError(''), 3000);
                       }
                     } else {
-                      // Web fallback - check localStorage
-                      const hasAccess = localStorage.getItem('npd_pro_access') === 'true';
+                      // Web fallback - check IndexedDB
+                      const { getSetting } = await import('@/utils/settingsStorage');
+                      const hasAccess = await getSetting('npd_pro_access', false);
                       if (hasAccess) {
                         onComplete();
                       } else {
@@ -675,11 +679,12 @@ export default function OnboardingFlow({
                         maxLength={20}
                       />
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const validCode = 'BUGTI';
                           if (adminCode.trim().toUpperCase() === validCode) {
-                            localStorage.setItem('npd_pro_access', 'true');
-                            localStorage.setItem('npd_admin_bypass', 'true');
+                            const { setSetting } = await import('@/utils/settingsStorage');
+                            await setSetting('npd_pro_access', true);
+                            await setSetting('npd_admin_bypass', true);
                             onComplete();
                           } else {
                             setAdminError(t('onboarding.paywall.invalidCode'));

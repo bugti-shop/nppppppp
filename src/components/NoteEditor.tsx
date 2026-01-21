@@ -656,208 +656,159 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
           </div>
 
           <div className="flex items-center gap-1">
-            {/* More options dropdown */}
+            {/* Table Picker Popover - only available for rich text notes */}
             {(noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <Popover open={isTablePickerOpen} onOpenChange={setIsTablePickerOpen}>
+                <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className={cn("h-9 w-9", noteType === 'sticky' && "text-black hover:text-black")}>
-                    <MoreVertical className="h-5 w-5" />
+                    <Table className="h-5 w-5" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-card z-50">
-                  <DropdownMenuItem onClick={handleInsertLink}>
-                    <Link2 className="h-4 w-4 mr-2" />
-                    {t('editor.insertLink')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleInsertComment}>
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    {t('editor.insertComment')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    // Trigger file input for image
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const imgHtml = `<div style="margin: 10px 0;"><img src="${reader.result}" style="max-width: 100%; height: auto; border-radius: 8px;" /></div>`;
-                          setContent(prev => prev + imgHtml);
-                          toast.success(t('editor.imageAdded'));
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    };
-                    input.click();
-                  }}>
-                    <Image className="h-4 w-4 mr-2" />
-                    {t('editor.insertImage')}
-                  </DropdownMenuItem>
-                  <Popover open={isTablePickerOpen} onOpenChange={setIsTablePickerOpen}>
-                    <PopoverTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Table className="h-4 w-4 mr-2" />
-                        {t('editor.insertTable')}
-                      </DropdownMenuItem>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-4 z-[60]" align="end" side="left">
-                      <div className="space-y-4">
-                        <div className="font-medium text-sm">{t('editor.insertTable')}</div>
-                        
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">{t('editor.rows')}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => setTableRows(Math.max(1, tableRows - 1))}
-                              >
-                                <Minus className="h-4 w-4 stroke-[3]" />
-                              </Button>
-                              <span className="w-8 text-center text-sm font-bold">{tableRows}</span>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => setTableRows(Math.min(20, tableRows + 1))}
-                              >
-                                <Plus className="h-4 w-4 stroke-[3]" />
-                              </Button>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">{t('editor.columns')}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => setTableCols(Math.max(1, tableCols - 1))}
-                              >
-                                <Minus className="h-4 w-4 stroke-[3]" />
-                              </Button>
-                              <span className="w-8 text-center text-sm font-bold">{tableCols}</span>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => setTableCols(Math.min(10, tableCols + 1))}
-                              >
-                                <Plus className="h-4 w-4 stroke-[3]" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Style Selection */}
-                        <div className="space-y-2">
-                          <span className="text-sm">{t('editor.style')}</span>
-                          <div className="grid grid-cols-2 gap-1">
-                            {TABLE_STYLE_OPTIONS.map((style) => (
-                              <Button
-                                key={style.id}
-                                variant={tableStyle === style.id ? "secondary" : "ghost"}
-                                size="sm"
-                                className={cn(
-                                  "h-8 text-xs justify-start",
-                                  tableStyle === style.id && "ring-1 ring-primary"
-                                )}
-                                onClick={() => setTableStyle(style.id)}
-                              >
-                                {style.name}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Grid preview */}
-                        <div className="border rounded p-2 bg-muted/30">
-                          <div 
-                            className="grid gap-0.5"
-                            style={{ 
-                              gridTemplateColumns: `repeat(${Math.min(tableCols, 6)}, 1fr)`,
-                            }}
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4 z-[60]" align="end" side="left">
+                  <div className="space-y-4">
+                    <div className="font-medium text-sm">{t('editor.insertTable')}</div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{t('editor.rows')}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setTableRows(Math.max(1, tableRows - 1))}
                           >
-                            {Array.from({ length: Math.min(tableRows, 5) * Math.min(tableCols, 6) }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="aspect-square bg-primary/20 rounded-sm min-w-[12px]"
-                              />
-                            ))}
-                          </div>
-                          {(tableRows > 5 || tableCols > 6) && (
-                            <p className="text-xs text-muted-foreground mt-1 text-center">
-                              {tableRows}×{tableCols} table
-                            </p>
-                          )}
+                            <Minus className="h-4 w-4 stroke-[3]" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-bold">{tableRows}</span>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setTableRows(Math.min(20, tableRows + 1))}
+                          >
+                            <Plus className="h-4 w-4 stroke-[3]" />
+                          </Button>
                         </div>
-
-                        <Button 
-                          onClick={() => {
-                            const styles = getTableStyles(tableStyle);
-                            const headerRow = `<tr>${Array(tableCols).fill(`<th style="${styles.headerCell}">${t('editor.tableHeader')}</th>`).join('')}</tr>`;
-                            const bodyRows = Array(tableRows - 1)
-                              .fill(null)
-                              .map((_, rowIdx) => {
-                                const isEven = rowIdx % 2 === 0;
-                                const cellStyle = tableStyle === 'striped' && isEven ? styles.stripedCell : styles.bodyCell;
-                                return `<tr>${Array(tableCols).fill(`<td style="${cellStyle}">${t('editor.tableCell')}</td>`).join('')}</tr>`;
-                              })
-                              .join('');
-                            
-                            // Create table with centered wrapper and trailing paragraph for cursor
-                            const tableHtml = `<div class="resizable-table-wrapper" style="width: 100%; margin: 16px 0; display: block; text-align: center;"><table style="${styles.table}; margin: 0 auto;" data-table-style="${tableStyle}">${headerRow}${bodyRows}</table></div><p style="text-align: center;"><br></p>`;
-                            
-                            // Focus editor and insert at cursor position
-                            if (editorRef.current) {
-                              editorRef.current.focus();
-                              document.execCommand('insertHTML', false, tableHtml);
-                              
-                              // Move cursor to the new paragraph
-                              const selection = window.getSelection();
-                              if (selection) {
-                                const paragraphs = editorRef.current.querySelectorAll('p');
-                                const lastP = paragraphs[paragraphs.length - 1];
-                                if (lastP) {
-                                  const range = document.createRange();
-                                  range.selectNodeContents(lastP);
-                                  range.collapse(false);
-                                  selection.removeAllRanges();
-                                  selection.addRange(range);
-                                }
-                              }
-                              
-                              // Update content state
-                              setContent(editorRef.current.innerHTML);
-                            }
-                            
-                            setIsTablePickerOpen(false);
-                            toast.success(t('editor.tableAdded', { rows: tableRows, cols: tableCols, style: tableStyle }));
-                          }} 
-                          className="w-full" 
-                          size="sm"
-                        >
-                          {t('editor.insertTableButton', { style: tableStyle.charAt(0).toUpperCase() + tableStyle.slice(1) })}
-                        </Button>
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleInsertHorizontalLine}>
-                    <Minus className="h-4 w-4 mr-2" />
-                    {t('editor.separator')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleInsertPageBreak}>
-                    <SeparatorHorizontal className="h-4 w-4 mr-2" />
-                    {t('editor.pageBreak')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{t('editor.columns')}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setTableCols(Math.max(1, tableCols - 1))}
+                          >
+                            <Minus className="h-4 w-4 stroke-[3]" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-bold">{tableCols}</span>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => setTableCols(Math.min(10, tableCols + 1))}
+                          >
+                            <Plus className="h-4 w-4 stroke-[3]" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Style Selection */}
+                    <div className="space-y-2">
+                      <span className="text-sm">{t('editor.style')}</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        {TABLE_STYLE_OPTIONS.map((style) => (
+                          <Button
+                            key={style.id}
+                            variant={tableStyle === style.id ? "secondary" : "ghost"}
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs justify-start",
+                              tableStyle === style.id && "ring-1 ring-primary"
+                            )}
+                            onClick={() => setTableStyle(style.id)}
+                          >
+                            {style.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Grid preview */}
+                    <div className="border rounded p-2 bg-muted/30">
+                      <div 
+                        className="grid gap-0.5"
+                        style={{ 
+                          gridTemplateColumns: `repeat(${Math.min(tableCols, 6)}, 1fr)`,
+                        }}
+                      >
+                        {Array.from({ length: Math.min(tableRows, 5) * Math.min(tableCols, 6) }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="aspect-square bg-primary/20 rounded-sm min-w-[12px]"
+                          />
+                        ))}
+                      </div>
+                      {(tableRows > 5 || tableCols > 6) && (
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                          {tableRows}×{tableCols} table
+                        </p>
+                      )}
+                    </div>
+
+                    <Button 
+                      onClick={() => {
+                        const styles = getTableStyles(tableStyle);
+                        const headerRow = `<tr>${Array(tableCols).fill(`<th style="${styles.headerCell}">${t('editor.tableHeader')}</th>`).join('')}</tr>`;
+                        const bodyRows = Array(tableRows - 1)
+                          .fill(null)
+                          .map((_, rowIdx) => {
+                            const isEven = rowIdx % 2 === 0;
+                            const cellStyle = tableStyle === 'striped' && isEven ? styles.stripedCell : styles.bodyCell;
+                            return `<tr>${Array(tableCols).fill(`<td style="${cellStyle}">${t('editor.tableCell')}</td>`).join('')}</tr>`;
+                          })
+                          .join('');
+                        
+                        // Create table with centered wrapper and trailing paragraph for cursor
+                        const tableHtml = `<div class="resizable-table-wrapper" style="width: 100%; margin: 16px 0; display: block; text-align: center;"><table style="${styles.table}; margin: 0 auto;" data-table-style="${tableStyle}">${headerRow}${bodyRows}</table></div><p style="text-align: center;"><br></p>`;
+                        
+                        // Focus editor and insert at cursor position
+                        if (editorRef.current) {
+                          editorRef.current.focus();
+                          document.execCommand('insertHTML', false, tableHtml);
+                          
+                          // Move cursor to the new paragraph
+                          const selection = window.getSelection();
+                          if (selection) {
+                            const paragraphs = editorRef.current.querySelectorAll('p');
+                            const lastP = paragraphs[paragraphs.length - 1];
+                            if (lastP) {
+                              const range = document.createRange();
+                              range.selectNodeContents(lastP);
+                              range.collapse(false);
+                              selection.removeAllRanges();
+                              selection.addRange(range);
+                            }
+                          }
+                          
+                          // Update content state
+                          setContent(editorRef.current.innerHTML);
+                        }
+                        
+                        setIsTablePickerOpen(false);
+                        toast.success(t('editor.tableAdded', { rows: tableRows, cols: tableCols, style: tableStyle }));
+                      }} 
+                      className="w-full" 
+                      size="sm"
+                    >
+                      {t('editor.insertTableButton', { style: tableStyle.charAt(0).toUpperCase() + tableStyle.slice(1) })}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
 
             <DropdownMenu>
