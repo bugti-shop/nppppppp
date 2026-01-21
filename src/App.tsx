@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WelcomeProvider, useWelcome } from "@/contexts/WelcomeContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
@@ -27,7 +27,7 @@ import TaskHistory from "./pages/todo/TaskHistory";
 import NotFound from "./pages/NotFound";
 import { NavigationBackProvider } from "@/components/NavigationBackProvider";
 import { notificationManager } from "@/utils/notifications";
-import { Capacitor } from "@capacitor/core";
+import { getSetting, setSetting } from "@/utils/settingsStorage";
 
 const queryClient = new QueryClient();
 
@@ -43,12 +43,54 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// Component to track and save last visited dashboard
+const DashboardTracker = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Save dashboard type when navigating between Notes and Todo sections
+    const path = location.pathname;
+    if (path.startsWith('/todo')) {
+      setSetting('lastDashboard', 'todo');
+    } else if (path === '/' || path === '/notes' || path === '/calendar' || path === '/settings') {
+      setSetting('lastDashboard', 'notes');
+    }
+  }, [location.pathname]);
+  
+  return null;
+};
+
+// Root redirect component that checks last dashboard
+const RootRedirect = () => {
+  const [targetPath, setTargetPath] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const checkLastDashboard = async () => {
+      const lastDashboard = await getSetting<string>('lastDashboard', 'notes');
+      setTargetPath(lastDashboard === 'todo' ? '/todo/today' : '/');
+    };
+    checkLastDashboard();
+  }, []);
+  
+  if (targetPath === null) {
+    // Show nothing while loading (instant)
+    return null;
+  }
+  
+  if (targetPath === '/') {
+    return <Index />;
+  }
+  
+  return <Navigate to={targetPath} replace />;
+};
+
 const AppRoutes = () => {
   return (
     <BrowserRouter>
       <NavigationBackProvider>
+        <DashboardTracker />
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/calendar" element={<NotesCalendar />} />
           <Route path="/clip" element={<WebClipper />} />

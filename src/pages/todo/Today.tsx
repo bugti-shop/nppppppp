@@ -2564,90 +2564,164 @@ const Today = () => {
               })()}
             </div>
           ) : groupByOption !== 'none' ? (
-            /* Grouped Flat Mode */
-            <div className="space-y-4">
-              {(() => {
-                // Generate groups based on groupByOption
-                let groups: { id: string; label: string; color: string; icon: React.ReactNode; tasks: TodoItem[] }[] = [];
-                
-                if (groupByOption === 'section') {
-                  groups = sortedSections.map(section => ({
-                    id: section.id,
-                    label: section.name,
-                    color: section.color,
-                    icon: <Columns3 className="h-4 w-4" style={{ color: section.color }} />,
-                    tasks: uncompletedItems.filter(item => item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
-                  }));
-                } else if (groupByOption === 'priority') {
-                  groups = [
-                    { id: 'high', label: t('grouping.highPriority'), color: '#ef4444', icon: <Flame className="h-4 w-4 text-red-500" />, tasks: uncompletedItems.filter(item => item.priority === 'high') },
-                    { id: 'medium', label: t('grouping.mediumPriority'), color: '#f59e0b', icon: <Flag className="h-4 w-4 text-amber-500" />, tasks: uncompletedItems.filter(item => item.priority === 'medium') },
-                    { id: 'low', label: t('grouping.lowPriority'), color: '#22c55e', icon: <Flag className="h-4 w-4 text-green-500" />, tasks: uncompletedItems.filter(item => item.priority === 'low') },
-                    { id: 'none', label: t('grouping.noPriority'), color: '#6b7280', icon: <Flag className="h-4 w-4 text-muted-foreground" />, tasks: uncompletedItems.filter(item => !item.priority || item.priority === 'none') },
-                  ];
+            /* Grouped Flat Mode with Drag & Drop */
+            <DragDropContext onDragEnd={(result) => {
+              if (!result.destination) return;
+              const { source, destination, draggableId } = result;
+              const taskId = draggableId;
+              const sourceGroup = source.droppableId.replace('grouped-', '');
+              const destGroup = destination.droppableId.replace('grouped-', '');
+              const destIndex = destination.index;
+              
+              // If dropped in same position, do nothing
+              if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+              
+              // Update task based on group type
+              if (sourceGroup !== destGroup) {
+                if (groupByOption === 'priority') {
+                  const priorityMap: Record<string, Priority> = { 'high': 'high', 'medium': 'medium', 'low': 'low', 'none': 'none' };
+                  updateItem(taskId, { priority: priorityMap[destGroup] || 'none' });
+                  toast.success('Priority updated');
+                } else if (groupByOption === 'section') {
+                  updateItem(taskId, { sectionId: destGroup });
+                  toast.success('Moved to section');
                 } else if (groupByOption === 'date') {
-                  const today = startOfDay(new Date());
-                  groups = [
-                    { id: 'overdue', label: t('grouping.overdue'), color: '#ef4444', icon: <AlertCircle className="h-4 w-4 text-red-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isBefore(new Date(item.dueDate), today)) },
-                    { id: 'today', label: t('grouping.today'), color: '#3b82f6', icon: <Sun className="h-4 w-4 text-blue-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isToday(new Date(item.dueDate))) },
-                    { id: 'tomorrow', label: t('grouping.tomorrow'), color: '#f59e0b', icon: <CalendarIcon2 className="h-4 w-4 text-amber-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isTomorrow(new Date(item.dueDate))) },
-                    { id: 'this-week', label: t('grouping.thisWeek'), color: '#10b981', icon: <CalendarIcon2 className="h-4 w-4 text-green-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isThisWeek(new Date(item.dueDate)) && !isToday(new Date(item.dueDate)) && !isTomorrow(new Date(item.dueDate))) },
-                    { id: 'later', label: t('grouping.later'), color: '#8b5cf6', icon: <Clock className="h-4 w-4 text-purple-500" />, tasks: uncompletedItems.filter(item => item.dueDate && !isBefore(new Date(item.dueDate), today) && !isThisWeek(new Date(item.dueDate))) },
-                    { id: 'no-date', label: t('grouping.noDate'), color: '#6b7280', icon: <CalendarX className="h-4 w-4 text-muted-foreground" />, tasks: uncompletedItems.filter(item => !item.dueDate) },
-                  ];
+                  const today = new Date();
+                  let newDate: Date | undefined;
+                  if (destGroup === 'overdue') newDate = subDays(today, 1);
+                  else if (destGroup === 'today') newDate = today;
+                  else if (destGroup === 'tomorrow') { newDate = new Date(); newDate.setDate(newDate.getDate() + 1); }
+                  else if (destGroup === 'this-week') { newDate = new Date(); newDate.setDate(newDate.getDate() + 3); }
+                  else if (destGroup === 'later') { newDate = new Date(); newDate.setDate(newDate.getDate() + 14); }
+                  else if (destGroup === 'no-date') newDate = undefined;
+                  updateItem(taskId, { dueDate: newDate });
+                  toast.success('Date updated');
                 }
-                
-                return groups.filter(g => g.tasks.length > 0).map(group => {
-                  const groupSectionId = `group-${groupByOption}-${group.id}`;
-                  const isCollapsed = collapsedViewSections.has(groupSectionId);
+                Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+              }
+              
+              // Persist order in destination group
+              const destGroupId = `grouped-${destGroup}`;
+              updateSectionOrder(destGroupId, [taskId]);
+              setOrderVersion(v => v + 1);
+            }}>
+              <div className="space-y-4">
+                {(() => {
+                  // Generate groups based on groupByOption
+                  let groups: { id: string; label: string; color: string; icon: React.ReactNode; tasks: TodoItem[] }[] = [];
                   
-                  return (
-                    <div key={group.id} className="bg-muted/30 rounded-xl border border-border/30 overflow-hidden">
-                      <button 
-                        onClick={() => toggleViewSectionCollapse(groupSectionId)}
-                        className="w-full flex items-center gap-2 px-3 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors"
-                        style={{ borderLeft: `4px solid ${group.color}` }}
-                      >
-                        {group.icon}
-                        <span className="text-sm font-semibold flex-1 text-left">{group.label}</span>
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                          {group.tasks.length}
-                        </span>
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  if (groupByOption === 'section') {
+                    groups = sortedSections.map(section => ({
+                      id: section.id,
+                      label: section.name,
+                      color: section.color,
+                      icon: <Columns3 className="h-4 w-4" style={{ color: section.color }} />,
+                      tasks: uncompletedItems.filter(item => item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
+                    }));
+                  } else if (groupByOption === 'priority') {
+                    groups = [
+                      { id: 'high', label: t('grouping.highPriority'), color: '#ef4444', icon: <Flame className="h-4 w-4 text-red-500" />, tasks: uncompletedItems.filter(item => item.priority === 'high') },
+                      { id: 'medium', label: t('grouping.mediumPriority'), color: '#f59e0b', icon: <Flag className="h-4 w-4 text-amber-500" />, tasks: uncompletedItems.filter(item => item.priority === 'medium') },
+                      { id: 'low', label: t('grouping.lowPriority'), color: '#22c55e', icon: <Flag className="h-4 w-4 text-green-500" />, tasks: uncompletedItems.filter(item => item.priority === 'low') },
+                      { id: 'none', label: t('grouping.noPriority'), color: '#6b7280', icon: <Flag className="h-4 w-4 text-muted-foreground" />, tasks: uncompletedItems.filter(item => !item.priority || item.priority === 'none') },
+                    ];
+                  } else if (groupByOption === 'date') {
+                    const today = startOfDay(new Date());
+                    groups = [
+                      { id: 'overdue', label: t('grouping.overdue'), color: '#ef4444', icon: <AlertCircle className="h-4 w-4 text-red-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isBefore(new Date(item.dueDate), today)) },
+                      { id: 'today', label: t('grouping.today'), color: '#3b82f6', icon: <Sun className="h-4 w-4 text-blue-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isToday(new Date(item.dueDate))) },
+                      { id: 'tomorrow', label: t('grouping.tomorrow'), color: '#f59e0b', icon: <CalendarIcon2 className="h-4 w-4 text-amber-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isTomorrow(new Date(item.dueDate))) },
+                      { id: 'this-week', label: t('grouping.thisWeek'), color: '#10b981', icon: <CalendarIcon2 className="h-4 w-4 text-green-500" />, tasks: uncompletedItems.filter(item => item.dueDate && isThisWeek(new Date(item.dueDate)) && !isToday(new Date(item.dueDate)) && !isTomorrow(new Date(item.dueDate))) },
+                      { id: 'later', label: t('grouping.later'), color: '#8b5cf6', icon: <Clock className="h-4 w-4 text-purple-500" />, tasks: uncompletedItems.filter(item => item.dueDate && !isBefore(new Date(item.dueDate), today) && !isThisWeek(new Date(item.dueDate))) },
+                      { id: 'no-date', label: t('grouping.noDate'), color: '#6b7280', icon: <CalendarX className="h-4 w-4 text-muted-foreground" />, tasks: uncompletedItems.filter(item => !item.dueDate) },
+                    ];
+                  }
+                  
+                  // Show all groups including empty ones for drag-drop targets
+                  return groups.map(group => {
+                    const groupSectionId = `group-${groupByOption}-${group.id}`;
+                    const isCollapsed = collapsedViewSections.has(groupSectionId);
+                    const orderedTasks = applyTaskOrder(group.tasks, `grouped-${group.id}`);
+                    
+                    return (
+                      <div key={group.id} className="bg-muted/30 rounded-xl border border-border/30 overflow-hidden">
+                        <button 
+                          onClick={() => toggleViewSectionCollapse(groupSectionId)}
+                          className="w-full flex items-center gap-2 px-3 py-3 border-b border-border/30 hover:bg-muted/20 transition-colors"
+                          style={{ borderLeft: `4px solid ${group.color}` }}
+                        >
+                          {group.icon}
+                          <span className="text-sm font-semibold flex-1 text-left">{group.label}</span>
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                            {group.tasks.length}
+                          </span>
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        {!isCollapsed && (
+                          <Droppable droppableId={`grouped-${group.id}`}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className={cn(
+                                  "p-2 space-y-1 min-h-[40px]",
+                                  compactMode && "p-1 space-y-0",
+                                  snapshot.isDraggingOver && "bg-primary/5"
+                                )}
+                              >
+                                {orderedTasks.length === 0 ? (
+                                  <div className="py-4 text-center text-sm text-muted-foreground">
+                                    Drop tasks here
+                                  </div>
+                                ) : (
+                                  orderedTasks.map((item, index) => (
+                                    <Draggable key={item.id} draggableId={item.id} index={index}>
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          className={cn(
+                                            "bg-card rounded-lg border border-border/50",
+                                            snapshot.isDragging && "shadow-lg ring-2 ring-primary"
+                                          )}
+                                        >
+                                          {renderTaskItem(item)}
+                                          {renderSubtasksInline(item)}
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))
+                                )}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
                         )}
-                      </button>
-                      {!isCollapsed && (
-                        <div className={cn("p-2 space-y-1", compactMode && "p-1 space-y-0")}>
-                          {group.tasks.map(item => (
-                            <div key={item.id} className="bg-card rounded-lg border border-border/50">
-                              {renderTaskItem(item)}
-                              {renderSubtasksInline(item)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      </div>
+                    );
+                  });
+                })()}
+                {/* Completed Section */}
+                {showCompleted && completedItems.length > 0 && (
+                  <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
+                    <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
+                      <CollapsibleTrigger asChild>
+                        <button className="w-full flex items-center justify-between px-2 py-2 hover:bg-muted/60 rounded-lg transition-colors">
+                          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">COMPLETED</span>
+                          <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm font-medium">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className={cn("space-y-2 mt-2", compactMode && "space-y-1 mt-1")}>{completedItems.map(renderTaskItem)}</CollapsibleContent>
                     </div>
-                  );
-                });
-              })()}
-              {/* Completed Section */}
-              {showCompleted && completedItems.length > 0 && (
-                <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
-                  <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
-                    <CollapsibleTrigger asChild>
-                      <button className="w-full flex items-center justify-between px-2 py-2 hover:bg-muted/60 rounded-lg transition-colors">
-                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">COMPLETED</span>
-                        <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm font-medium">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
-                      </button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className={cn("space-y-2 mt-2", compactMode && "space-y-1 mt-1")}>{completedItems.map(renderTaskItem)}</CollapsibleContent>
-                  </div>
-                </Collapsible>
-              )}
-            </div>
+                  </Collapsible>
+                )}
+              </div>
+            </DragDropContext>
           ) : (
             /* Flat/Card Mode - Vertical Sections */
             <div className="space-y-4">
