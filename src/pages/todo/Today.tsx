@@ -118,6 +118,8 @@ const Today = () => {
   const [showStatusBadge, setShowStatusBadge] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<'custom' | 'date' | 'priority'>('custom');
   const [optionsSortBy, setOptionsSortBy] = useState<'custom' | 'date' | 'priority'>('custom');
+  // Flag to prevent saving settings before they're loaded from IndexedDB
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -199,6 +201,9 @@ const Today = () => {
       
       const savedGroupByOption = await getSetting<'none' | 'section' | 'priority' | 'date'>('todoGroupByOption', 'none');
       setGroupByOption(savedGroupByOption);
+      
+      // Mark settings as loaded to enable saving
+      setSettingsLoaded(true);
     };
     loadSettings();
   }, []);
@@ -211,25 +216,27 @@ const Today = () => {
     });
     window.dispatchEvent(new Event('tasksUpdated'));
   }, [items]);
-  useEffect(() => { setSetting('todoFolders', folders); }, [folders]);
-  useEffect(() => { setSetting('todoSections', sections); }, [sections]);
-  useEffect(() => { setSetting('todoShowCompleted', showCompleted); }, [showCompleted]);
+  // Only save settings AFTER they have been loaded from IndexedDB to prevent race conditions
+  useEffect(() => { if (settingsLoaded) setSetting('todoFolders', folders); }, [folders, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoSections', sections); }, [sections, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoShowCompleted', showCompleted); }, [showCompleted, settingsLoaded]);
   useEffect(() => { 
+    if (!settingsLoaded) return;
     setSetting('todoDateFilter', dateFilter); 
     setSetting('todoPriorityFilter', priorityFilter);
     setSetting('todoStatusFilter', statusFilter);
     setSetting('todoTagFilter', tagFilter);
-  }, [dateFilter, priorityFilter, statusFilter, tagFilter]);
-  useEffect(() => { setSetting('todoViewMode', viewMode); logActivity('view_mode_change', `View mode: ${viewMode}`); }, [viewMode]);
-  useEffect(() => { setSetting('todoHideDetailsOptions', hideDetailsOptions); }, [hideDetailsOptions]);
-  useEffect(() => { setSetting('todoSortBy', sortBy); logActivity('sort_change', `Sort by: ${sortBy}`); }, [sortBy]);
-  useEffect(() => { setSetting('todoSmartList', smartList); logActivity('smart_list_change', `Smart list: ${smartList}`); }, [smartList]);
-  useEffect(() => { setSetting('todoSelectedFolder', selectedFolderId || 'null'); }, [selectedFolderId]);
-  useEffect(() => { setSetting('todoDefaultSectionId', defaultSectionId || ''); }, [defaultSectionId]);
-  useEffect(() => { setSetting('todoTaskAddPosition', taskAddPosition); }, [taskAddPosition]);
-  useEffect(() => { setSetting('todoShowStatusBadge', showStatusBadge); }, [showStatusBadge]);
-  useEffect(() => { setSetting('todoCompactMode', compactMode); logActivity('compact_mode_toggle', `Compact mode: ${compactMode}`); }, [compactMode]);
-  useEffect(() => { setSetting('todoGroupByOption', groupByOption); logActivity('group_by_change', `Group by: ${groupByOption}`); }, [groupByOption]);
+  }, [dateFilter, priorityFilter, statusFilter, tagFilter, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) { setSetting('todoViewMode', viewMode); logActivity('view_mode_change', `View mode: ${viewMode}`); } }, [viewMode, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoHideDetailsOptions', hideDetailsOptions); }, [hideDetailsOptions, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) { setSetting('todoSortBy', sortBy); logActivity('sort_change', `Sort by: ${sortBy}`); } }, [sortBy, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) { setSetting('todoSmartList', smartList); logActivity('smart_list_change', `Smart list: ${smartList}`); } }, [smartList, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoSelectedFolder', selectedFolderId || 'null'); }, [selectedFolderId, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoDefaultSectionId', defaultSectionId || ''); }, [defaultSectionId, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoTaskAddPosition', taskAddPosition); }, [taskAddPosition, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) setSetting('todoShowStatusBadge', showStatusBadge); }, [showStatusBadge, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) { setSetting('todoCompactMode', compactMode); logActivity('compact_mode_toggle', `Compact mode: ${compactMode}`); } }, [compactMode, settingsLoaded]);
+  useEffect(() => { if (settingsLoaded) { setSetting('todoGroupByOption', groupByOption); logActivity('group_by_change', `Group by: ${groupByOption}`); } }, [groupByOption, settingsLoaded]);
 
   // Start geofencing for location-based reminders
   useEffect(() => {
