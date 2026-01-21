@@ -25,7 +25,7 @@ export const TodoLayout = ({ children, title, searchValue, onSearchChange }: Tod
   const syncEnabled = syncManager.isSyncEnabled();
 
   return (
-    <div className="min-h-screen bg-background animate-fade-in">
+    <div className="min-h-screen bg-background">
       <header 
         className="border-b sticky top-0 bg-background z-10"
         style={{

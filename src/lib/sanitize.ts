@@ -13,17 +13,20 @@ const RICH_TEXT_CONFIG = {
     'table', 'thead', 'tbody', 'tr', 'td', 'th',
     'strong', 'em', 'code', 'pre', 'mark',
     'blockquote', 'hr', 'sub', 'sup', 's', 'strike',
-    'font', 'small', 'big'
+    'font', 'small', 'big',
+    'audio', 'source', // Allow audio elements for voice recordings
   ],
   ALLOWED_ATTR: [
     'href', 'src', 'alt', 'class', 'style', 'id',
     'target', 'rel', 'width', 'height', 'colspan', 'rowspan',
     'data-id', 'data-type', 'data-find-highlight',
-    'color', 'size', 'face', 'contenteditable', 'draggable'
+    'data-recording-id', 'data-audio-src', // Allow audio data attributes
+    'color', 'size', 'face', 'contenteditable', 'draggable',
+    'controls', 'type', // Allow audio controls
   ],
   ALLOW_DATA_ATTR: true,
   // Allow safe URLs only
-  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   // Return string instead of TrustedHTML
   RETURN_TRUSTED_TYPE: false,
 };
