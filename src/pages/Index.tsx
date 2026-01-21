@@ -199,48 +199,75 @@ const Index = () => {
 
   const handleDeleteNote = (id: string) => {
     // Move to trash instead of permanent delete
-    setNotes((prev) => prev.map((n) => 
-      n.id === id 
-        ? { ...n, isDeleted: true, deletedAt: new Date() } 
-        : n
-    ));
+    setNotes((prev) => {
+      const updatedNotes = prev.map((n) => 
+        n.id === id 
+          ? { ...n, isDeleted: true, deletedAt: new Date() } 
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     logActivity('note_delete', 'Note moved to trash', { entityId: id, entityType: 'note' });
   };
 
   const handleArchiveNote = (id: string) => {
-    setNotes((prev) => prev.map((n) => 
-      n.id === id 
-        ? { ...n, isArchived: true, archivedAt: new Date() } 
-        : n
-    ));
+    setNotes((prev) => {
+      const updatedNotes = prev.map((n) => 
+        n.id === id 
+          ? { ...n, isArchived: true, archivedAt: new Date() } 
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     logActivity('note_archive', 'Note archived', { entityId: id, entityType: 'note' });
   };
 
   const handleRestoreFromTrash = (id: string) => {
-    setNotes((prev) => prev.map((n) => 
-      n.id === id 
-        ? { ...n, isDeleted: false, deletedAt: undefined } 
-        : n
-    ));
+    setNotes((prev) => {
+      const updatedNotes = prev.map((n) => 
+        n.id === id 
+          ? { ...n, isDeleted: false, deletedAt: undefined } 
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     logActivity('note_restore', 'Note restored from trash', { entityId: id, entityType: 'note' });
   };
 
   const handleRestoreFromArchive = (id: string) => {
-    setNotes((prev) => prev.map((n) => 
-      n.id === id 
-        ? { ...n, isArchived: false, archivedAt: undefined } 
-        : n
-    ));
+    setNotes((prev) => {
+      const updatedNotes = prev.map((n) => 
+        n.id === id 
+          ? { ...n, isArchived: false, archivedAt: undefined } 
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     logActivity('note_restore', 'Note restored from archive', { entityId: id, entityType: 'note' });
   };
 
-  const handlePermanentDelete = (id: string) => {
+  const handlePermanentDelete = async (id: string) => {
+    // Delete from IndexedDB first
+    await deleteNoteFromDB(id);
     setNotes((prev) => prev.filter((n) => n.id !== id));
     logActivity('note_delete', 'Note permanently deleted', { entityId: id, entityType: 'note' });
   };
 
   const handleEmptyTrash = () => {
-    setNotes((prev) => prev.filter((n) => !n.isDeleted));
+    setNotes((prev) => {
+      const updatedNotes = prev.filter((n) => !n.isDeleted);
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     logActivity('note_delete', 'Trash emptied');
   };
 
@@ -433,21 +460,31 @@ const Index = () => {
   };
 
   const handleBulkDelete = () => {
-    setNotes(prev => prev.map(n =>
-      selectedNoteIds.includes(n.id)
-        ? { ...n, isDeleted: true, deletedAt: new Date() }
-        : n
-    ));
+    setNotes(prev => {
+      const updatedNotes = prev.map(n =>
+        selectedNoteIds.includes(n.id)
+          ? { ...n, isDeleted: true, deletedAt: new Date() }
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     setSelectedNoteIds([]);
     setIsSelectionMode(false);
   };
 
   const handleBulkArchive = () => {
-    setNotes(prev => prev.map(n =>
-      selectedNoteIds.includes(n.id)
-        ? { ...n, isArchived: true, archivedAt: new Date() }
-        : n
-    ));
+    setNotes(prev => {
+      const updatedNotes = prev.map(n =>
+        selectedNoteIds.includes(n.id)
+          ? { ...n, isArchived: true, archivedAt: new Date() }
+          : n
+      );
+      // Persist to IndexedDB
+      saveNotesToDB(updatedNotes);
+      return updatedNotes;
+    });
     setSelectedNoteIds([]);
     setIsSelectionMode(false);
   };
