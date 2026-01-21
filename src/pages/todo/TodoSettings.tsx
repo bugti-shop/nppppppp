@@ -1,4 +1,4 @@
-import { ChevronRight, Settings as SettingsIcon, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange, Plus, Eye, EyeOff, Trash2, Edit2, Target, Zap, Brain, Sparkles, Palette, Check, ExternalLink, Bell } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange, Plus, Eye, EyeOff, Trash2, Edit2, Target, Zap, Brain, Sparkles, Palette, Check, ExternalLink, Bell, FolderArchive } from 'lucide-react';
 import { useDarkMode, themes } from '@/hooks/useDarkMode';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, lazy, Suspense } from 'react';
@@ -14,6 +14,7 @@ import { TodoLayout } from './TodoLayout';
 import { loadTasksFromDB, saveTasksToDB } from '@/utils/taskStorage';
 import { getSetting, setSetting, getAllSettings } from '@/utils/settingsStorage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { BackupFolderSheet } from '@/components/BackupFolderSheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,6 +109,7 @@ const TodoSettings = () => {
   
   // Auto-reminder time settings
   const [showAutoReminderDialog, setShowAutoReminderDialog] = useState(false);
+  const [showBackupFolder, setShowBackupFolder] = useState(false);
   const [morningReminderHour, setMorningReminderHour] = useState(9);
   const [afternoonReminderHour, setAfternoonReminderHour] = useState(14);
   const [eveningReminderHour, setEveningReminderHour] = useState(19);
@@ -402,7 +404,20 @@ const TodoSettings = () => {
             </button>
           </div>
 
-          {/* Auto-Reminder Settings Section */}
+          {/* Backup Folder (E Folder) */}
+          <div className="bg-card border rounded-lg">
+            <button
+              onClick={() => setShowBackupFolder(true)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FolderArchive className="h-5 w-5 text-amber-500" />
+                <span className="text-foreground text-sm font-medium">{t('settings.backupFolder', 'E Folder (Backups)')}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+
           <div className="bg-card border rounded-lg">
             <div className="p-4 border-b">
               <div className="flex items-center gap-2">
@@ -1148,6 +1163,9 @@ const TodoSettings = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Backup Folder Sheet */}
+      <BackupFolderSheet open={showBackupFolder} onOpenChange={setShowBackupFolder} />
     </TodoLayout>
   );
 };

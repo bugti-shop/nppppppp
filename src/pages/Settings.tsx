@@ -1,5 +1,5 @@
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ChevronRight, Settings as SettingsIcon, Crown, CreditCard, Palette, Check, Clock, Vibrate, ExternalLink, Globe } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Crown, CreditCard, Palette, Check, Clock, Vibrate, ExternalLink, Globe, FolderArchive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { languages } from '@/i18n';
 import { loadNotesFromDB, saveNotesToDB } from '@/utils/noteStorage';
 import { getSetting, setSetting, getAllSettings, clearAllSettings } from '@/utils/settingsStorage';
+import { BackupFolderSheet } from '@/components/BackupFolderSheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +47,7 @@ const Settings = () => {
   const [showThemeDialog, setShowThemeDialog] = useState(false);
   const [showHapticDialog, setShowHapticDialog] = useState(false);
   const [showLanguageDialog, setShowLanguageDialog] = useState(false);
+  const [showBackupFolder, setShowBackupFolder] = useState(false);
   const [hapticIntensity, setHapticIntensity] = useState<'off' | 'light' | 'medium' | 'heavy'>('medium');
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -361,6 +363,20 @@ const Settings = () => {
               <div className="flex items-center gap-3">
                 <ExternalLink className="h-5 w-5 text-emerald-500" />
                 <span className="text-foreground text-sm">{t('settings.integrationsImport')}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Backup Folder (E Folder) */}
+          <div className="space-y-1">
+            <button
+              onClick={() => setShowBackupFolder(true)}
+              className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-muted transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FolderArchive className="h-5 w-5 text-amber-500" />
+                <span className="text-foreground text-sm">{t('settings.backupFolder', 'E Folder (Backups)')}</span>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -692,6 +708,8 @@ const Settings = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Backup Folder Sheet */}
+      <BackupFolderSheet open={showBackupFolder} onOpenChange={setShowBackupFolder} />
 
     </div>
   );
