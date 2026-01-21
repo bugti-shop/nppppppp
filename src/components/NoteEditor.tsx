@@ -818,6 +818,43 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-card z-50">
+                {/* Global Font Size Control */}
+                {['sticky', 'lined', 'regular'].includes(noteType) && (
+                  <>
+                    <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2">
+                      <FileType className="h-4 w-4" />
+                      {t('editor.globalFontSize', 'Font Size')}
+                    </div>
+                    <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          const currentSize = parseInt(fontSize) || 16;
+                          const newSize = Math.max(10, currentSize - 2);
+                          setFontSize(`${newSize}px`);
+                        }}
+                      >
+                        <Minus className="h-4 w-4 stroke-[3]" />
+                      </Button>
+                      <span className="text-sm font-semibold min-w-[48px] text-center">{fontSize}</span>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          const currentSize = parseInt(fontSize) || 16;
+                          const newSize = Math.min(48, currentSize + 2);
+                          setFontSize(`${newSize}px`);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 stroke-[3]" />
+                      </Button>
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={() => setShowStats(!showStats)}>
                   <BarChart3 className="h-4 w-4 mr-2" />
                   {showStats ? t('editor.hideStats') : t('editor.showStats')}
