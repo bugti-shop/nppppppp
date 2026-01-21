@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Note, NoteType, Folder } from '@/types/note';
@@ -9,6 +9,7 @@ import { PersonalizedTips } from '@/components/PersonalizedTips';
 import { FolderManager } from '@/components/FolderManager';
 import { SyncBadge } from '@/components/SyncStatusIndicator';
 import { MasonryNotesGrid } from '@/components/MasonryNotesGrid';
+import { VirtualizedNotesGrid, VirtualizedNotesList, shouldVirtualizeNotes } from '@/components/VirtualizedNotesGrid';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { syncManager } from '@/utils/syncManager';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -813,15 +814,28 @@ const Index = () => {
                       <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                       {t('notes.favorites')}
                     </h2>
-                    <MasonryNotesGrid
-                      notes={filteredNotes.filter(n => n.isFavorite)}
-                      onEdit={handleEditNote}
-                      onDelete={handleDeleteNote}
-                      onArchive={handleArchiveNote}
-                      isSelectionMode={isSelectionMode}
-                      selectedNoteIds={selectedNoteIds}
-                      onToggleSelection={handleToggleNoteSelection}
-                    />
+                    {shouldVirtualizeNotes(filteredNotes.filter(n => n.isFavorite).length) ? (
+                      <VirtualizedNotesGrid
+                        notes={filteredNotes.filter(n => n.isFavorite)}
+                        onEdit={handleEditNote}
+                        onDelete={handleDeleteNote}
+                        onArchive={handleArchiveNote}
+                        isSelectionMode={isSelectionMode}
+                        selectedNoteIds={selectedNoteIds}
+                        onToggleSelection={handleToggleNoteSelection}
+                        className="h-[300px]"
+                      />
+                    ) : (
+                      <MasonryNotesGrid
+                        notes={filteredNotes.filter(n => n.isFavorite)}
+                        onEdit={handleEditNote}
+                        onDelete={handleDeleteNote}
+                        onArchive={handleArchiveNote}
+                        isSelectionMode={isSelectionMode}
+                        selectedNoteIds={selectedNoteIds}
+                        onToggleSelection={handleToggleNoteSelection}
+                      />
+                    )}
                   </div>
                 )}
                 
@@ -838,15 +852,28 @@ const Index = () => {
                     {filteredNotes.filter(n => n.isFavorite).length > 0 && (
                       <h2 className="text-lg font-semibold text-muted-foreground mb-3">{t('notes.allNotes')}</h2>
                     )}
-                    <MasonryNotesGrid
-                      notes={filteredNotes.filter(n => !n.isFavorite)}
-                      onEdit={handleEditNote}
-                      onDelete={handleDeleteNote}
-                      onArchive={handleArchiveNote}
-                      isSelectionMode={isSelectionMode}
-                      selectedNoteIds={selectedNoteIds}
-                      onToggleSelection={handleToggleNoteSelection}
-                    />
+                    {shouldVirtualizeNotes(filteredNotes.filter(n => !n.isFavorite).length) ? (
+                      <VirtualizedNotesGrid
+                        notes={filteredNotes.filter(n => !n.isFavorite)}
+                        onEdit={handleEditNote}
+                        onDelete={handleDeleteNote}
+                        onArchive={handleArchiveNote}
+                        isSelectionMode={isSelectionMode}
+                        selectedNoteIds={selectedNoteIds}
+                        onToggleSelection={handleToggleNoteSelection}
+                        className="h-[calc(100vh-350px)]"
+                      />
+                    ) : (
+                      <MasonryNotesGrid
+                        notes={filteredNotes.filter(n => !n.isFavorite)}
+                        onEdit={handleEditNote}
+                        onDelete={handleDeleteNote}
+                        onArchive={handleArchiveNote}
+                        isSelectionMode={isSelectionMode}
+                        selectedNoteIds={selectedNoteIds}
+                        onToggleSelection={handleToggleNoteSelection}
+                      />
+                    )}
                   </div>
                 )}
               </>
@@ -893,30 +920,45 @@ const Index = () => {
                     </p>
                   </div>
                 ) : filteredNotes.filter(n => !n.isFavorite).length > 0 && (
-                  <div className="space-y-3">
+                  <>
                     {filteredNotes.filter(n => n.isFavorite).length > 0 && (
-                      <h2 className="text-lg font-semibold text-muted-foreground">{t('notes.allNotes')}</h2>
+                      <h2 className="text-lg font-semibold text-muted-foreground mb-3">{t('notes.allNotes')}</h2>
                     )}
-                    {filteredNotes.filter(n => !n.isFavorite).map((note) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
+                    {shouldVirtualizeNotes(filteredNotes.filter(n => !n.isFavorite).length) ? (
+                      <VirtualizedNotesList
+                        notes={filteredNotes.filter(n => !n.isFavorite)}
                         onEdit={handleEditNote}
                         onDelete={handleDeleteNote}
                         onArchive={handleArchiveNote}
-                        onTogglePin={handleTogglePin}
-                        onToggleFavorite={handleToggleFavorite}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
-                        onDragEnd={handleDragEnd}
                         isSelectionMode={isSelectionMode}
-                        isSelected={selectedNoteIds.includes(note.id)}
+                        selectedNoteIds={selectedNoteIds}
                         onToggleSelection={handleToggleNoteSelection}
-                        onDuplicate={handleDuplicateNote}
+                        className="h-[calc(100vh-350px)]"
                       />
-                    ))}
-                  </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredNotes.filter(n => !n.isFavorite).map((note) => (
+                          <NoteCard
+                            key={note.id}
+                            note={note}
+                            onEdit={handleEditNote}
+                            onDelete={handleDeleteNote}
+                            onArchive={handleArchiveNote}
+                            onTogglePin={handleTogglePin}
+                            onToggleFavorite={handleToggleFavorite}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnd={handleDragEnd}
+                            isSelectionMode={isSelectionMode}
+                            isSelected={selectedNoteIds.includes(note.id)}
+                            onToggleSelection={handleToggleNoteSelection}
+                            onDuplicate={handleDuplicateNote}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
