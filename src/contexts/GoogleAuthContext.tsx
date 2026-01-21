@@ -31,9 +31,7 @@ interface GoogleAuthContextType {
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
 
-// Android Client ID (for native Android sign-in validation)
-const GOOGLE_ANDROID_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
-// Web Client ID (serverClientId - required for token generation)
+// Web Client ID (used for OAuth flow)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
 
 const SCOPES = [
@@ -115,74 +113,75 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const handleOAuthCallback = async (accessToken: string, expiresIn: number): Promise<boolean> => {
+    try {
+      // Fetch user info
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        
+        const googleUser: GoogleUser = {
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          givenName: userData.given_name,
+          familyName: userData.family_name,
+          imageUrl: userData.picture,
+        };
+
+        const googleTokens: GoogleAuthTokens = {
+          accessToken,
+          expiresAt: Date.now() + (expiresIn * 1000),
+        };
+
+        setUser(googleUser);
+        setTokens(googleTokens);
+        await setSetting(STORAGE_KEYS.USER, googleUser);
+        await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
+
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error handling OAuth callback:', error);
+      return false;
+    }
+  };
+
   const signIn = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
     try {
+      // Use web OAuth flow for both web and native (works universally)
+      const redirectUri = Capacitor.isNativePlatform() 
+        ? 'https://nppppppp.lovable.app/auth/callback'
+        : window.location.origin + '/auth/callback';
+      
+      const state = Math.random().toString(36).substring(7);
+      
+      // Store state for verification
+      sessionStorage.setItem('google_oauth_state', state);
+
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('response_type', 'token');
+      authUrl.searchParams.set('scope', SCOPES);
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('prompt', 'select_account');
+
       if (Capacitor.isNativePlatform()) {
-        // Native sign-in using @capgo/capacitor-social-login
-        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        // For native, open in system browser and handle deep link callback
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: authUrl.toString() });
         
-        // Initialize the plugin
-        await SocialLogin.initialize({
-          google: {
-            webClientId: GOOGLE_WEB_CLIENT_ID,
-          },
-        });
-
-        // Perform login
-        const result = await SocialLogin.login({
-          provider: 'google',
-          options: {
-            scopes: SCOPES.split(' '),
-          },
-        });
-        
-        if (result.provider === 'google' && result.result) {
-          // Cast to any to handle varying response structures
-          const googleResult = result.result as any;
-          const profile = googleResult.profile || googleResult.user || googleResult;
-          
-          const googleUser: GoogleUser = {
-            id: profile?.id || profile?.sub || '',
-            email: profile?.email || '',
-            name: profile?.name || profile?.displayName || '',
-            givenName: profile?.givenName || profile?.given_name,
-            familyName: profile?.familyName || profile?.family_name,
-            imageUrl: profile?.imageUrl || profile?.picture,
-          };
-
-          const googleTokens: GoogleAuthTokens = {
-            accessToken: googleResult.accessToken?.token || googleResult.accessToken || '',
-            refreshToken: googleResult.refreshToken,
-            idToken: googleResult.idToken,
-            expiresAt: Date.now() + 3600000, // 1 hour
-          };
-
-          setUser(googleUser);
-          setTokens(googleTokens);
-          await setSetting(STORAGE_KEYS.USER, googleUser);
-          await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
-
-          return true;
-        }
+        // The callback will be handled by the AuthCallback page
+        // Return false here, the actual auth will complete when user returns
         return false;
       } else {
-        // Web OAuth flow
-        const redirectUri = window.location.origin + '/auth/callback';
-        const state = Math.random().toString(36).substring(7);
-        
-        // Store state for verification
-        sessionStorage.setItem('google_oauth_state', state);
-
-        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-        authUrl.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
-        authUrl.searchParams.set('redirect_uri', redirectUri);
-        authUrl.searchParams.set('response_type', 'token');
-        authUrl.searchParams.set('scope', SCOPES);
-        authUrl.searchParams.set('state', state);
-        authUrl.searchParams.set('prompt', 'select_account');
-
-        // Open OAuth popup
+        // Web: Open OAuth popup
         const popup = window.open(authUrl.toString(), 'google-auth', 'width=500,height=600');
         
         return new Promise((resolve) => {
@@ -193,38 +192,8 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               window.removeEventListener('message', handleMessage);
               
               const { accessToken, expiresIn } = event.data;
-              
-              // Fetch user info
-              const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              });
-              
-              if (userResponse.ok) {
-                const userData = await userResponse.json();
-                
-                const googleUser: GoogleUser = {
-                  id: userData.id,
-                  email: userData.email,
-                  name: userData.name,
-                  givenName: userData.given_name,
-                  familyName: userData.family_name,
-                  imageUrl: userData.picture,
-                };
-
-                const googleTokens: GoogleAuthTokens = {
-                  accessToken,
-                  expiresAt: Date.now() + (expiresIn * 1000),
-                };
-
-                setUser(googleUser);
-                setTokens(googleTokens);
-                await setSetting(STORAGE_KEYS.USER, googleUser);
-                await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
-
-                resolve(true);
-              } else {
-                resolve(false);
-              }
+              const success = await handleOAuthCallback(accessToken, expiresIn);
+              resolve(success);
             } else if (event.data?.type === 'google-auth-error') {
               window.removeEventListener('message', handleMessage);
               resolve(false);
@@ -254,11 +223,6 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
-      if (Capacitor.isNativePlatform()) {
-        const { SocialLogin } = await import('@capgo/capacitor-social-login');
-        await SocialLogin.logout({ provider: 'google' });
-      }
-
       // Revoke token if we have one
       if (tokens?.accessToken) {
         await fetch(`https://oauth2.googleapis.com/revoke?token=${tokens.accessToken}`, {
