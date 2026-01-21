@@ -31,8 +31,11 @@ interface GoogleAuthContextType {
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
 
-const GOOGLE_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
+// Android Client ID (for native Android sign-in validation)
+const GOOGLE_ANDROID_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
+// Web Client ID (serverClientId - required for token generation)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
+
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.calendars',
@@ -87,7 +90,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID,
+          client_id: GOOGLE_WEB_CLIENT_ID,
           refresh_token: refreshToken,
           grant_type: 'refresh_token',
         }),
@@ -116,41 +119,53 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsLoading(true);
     try {
       if (Capacitor.isNativePlatform()) {
-        // Native sign-in using Capacitor plugin
-        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        // Native sign-in using @capgo/capacitor-social-login
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
         
-        // Note: serverClientId is required for Android but not in TypeScript types
-        await GoogleAuth.initialize({
-          clientId: GOOGLE_CLIENT_ID,
-          scopes: SCOPES.split(' '),
-          grantOfflineAccess: true,
-          // serverClientId is set in capacitor.config.ts for Android
-        } as any);
+        // Initialize the plugin
+        await SocialLogin.initialize({
+          google: {
+            webClientId: GOOGLE_WEB_CLIENT_ID,
+          },
+        });
 
-        const result = await GoogleAuth.signIn();
+        // Perform login
+        const result = await SocialLogin.login({
+          provider: 'google',
+          options: {
+            scopes: SCOPES.split(' '),
+          },
+        });
         
-        const googleUser: GoogleUser = {
-          id: result.id || '',
-          email: result.email || '',
-          name: result.name || '',
-          givenName: result.givenName,
-          familyName: result.familyName,
-          imageUrl: result.imageUrl,
-        };
+        if (result.provider === 'google' && result.result) {
+          // Cast to any to handle varying response structures
+          const googleResult = result.result as any;
+          const profile = googleResult.profile || googleResult.user || googleResult;
+          
+          const googleUser: GoogleUser = {
+            id: profile?.id || profile?.sub || '',
+            email: profile?.email || '',
+            name: profile?.name || profile?.displayName || '',
+            givenName: profile?.givenName || profile?.given_name,
+            familyName: profile?.familyName || profile?.family_name,
+            imageUrl: profile?.imageUrl || profile?.picture,
+          };
 
-        const googleTokens: GoogleAuthTokens = {
-          accessToken: result.authentication?.accessToken || '',
-          refreshToken: result.authentication?.refreshToken,
-          idToken: result.authentication?.idToken,
-          expiresAt: Date.now() + 3600000, // 1 hour
-        };
+          const googleTokens: GoogleAuthTokens = {
+            accessToken: googleResult.accessToken?.token || googleResult.accessToken || '',
+            refreshToken: googleResult.refreshToken,
+            idToken: googleResult.idToken,
+            expiresAt: Date.now() + 3600000, // 1 hour
+          };
 
-        setUser(googleUser);
-        setTokens(googleTokens);
-        await setSetting(STORAGE_KEYS.USER, googleUser);
-        await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
+          setUser(googleUser);
+          setTokens(googleTokens);
+          await setSetting(STORAGE_KEYS.USER, googleUser);
+          await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
 
-        return true;
+          return true;
+        }
+        return false;
       } else {
         // Web OAuth flow
         const redirectUri = window.location.origin + '/auth/callback';
@@ -160,7 +175,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         sessionStorage.setItem('google_oauth_state', state);
 
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-        authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+        authUrl.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
         authUrl.searchParams.set('redirect_uri', redirectUri);
         authUrl.searchParams.set('response_type', 'token');
         authUrl.searchParams.set('scope', SCOPES);
@@ -240,8 +255,8 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const signOut = useCallback(async (): Promise<void> => {
     try {
       if (Capacitor.isNativePlatform()) {
-        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-        await GoogleAuth.signOut();
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        await SocialLogin.logout({ provider: 'google' });
       }
 
       // Revoke token if we have one
