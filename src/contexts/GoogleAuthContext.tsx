@@ -120,24 +120,41 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       if (Capacitor.isNativePlatform()) {
         // Native in-app Google Sign-In using @capgo/capacitor-social-login
+        console.log('[GoogleAuth] Starting native sign-in flow...');
+        
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         
         // Initialize the plugin with Web Client ID as serverClientId
-        await SocialLogin.initialize({
-          google: {
-            webClientId: GOOGLE_WEB_CLIENT_ID,
-          },
-        });
+        console.log('[GoogleAuth] Initializing SocialLogin with webClientId:', GOOGLE_WEB_CLIENT_ID);
+        
+        try {
+          await SocialLogin.initialize({
+            google: {
+              webClientId: GOOGLE_WEB_CLIENT_ID,
+            },
+          });
+          console.log('[GoogleAuth] SocialLogin initialized successfully');
+        } catch (initError: any) {
+          console.error('[GoogleAuth] Initialize error:', initError?.message || initError);
+          throw initError;
+        }
 
         // Perform native Google login
-        const result = await SocialLogin.login({
-          provider: 'google',
-          options: {
-            scopes: SCOPES.split(' '),
-          },
-        });
-        
-        console.log('Google Sign-In result:', JSON.stringify(result, null, 2));
+        console.log('[GoogleAuth] Calling SocialLogin.login...');
+        let result;
+        try {
+          result = await SocialLogin.login({
+            provider: 'google',
+            options: {
+              scopes: SCOPES.split(' '),
+            },
+          });
+          console.log('[GoogleAuth] Login result:', JSON.stringify(result, null, 2));
+        } catch (loginError: any) {
+          console.error('[GoogleAuth] Login error:', loginError?.message || loginError);
+          console.error('[GoogleAuth] Full error object:', JSON.stringify(loginError, null, 2));
+          throw loginError;
+        }
         
         if (result.provider === 'google' && result.result) {
           const googleResult = result.result as any;
@@ -164,9 +181,10 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           await setSetting(STORAGE_KEYS.USER, googleUser);
           await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
 
-          console.log('Google Sign-In successful:', googleUser.email);
+          console.log('[GoogleAuth] Sign-In successful:', googleUser.email);
           return true;
         }
+        console.warn('[GoogleAuth] No valid result received');
         return false;
       } else {
         // Web OAuth flow
