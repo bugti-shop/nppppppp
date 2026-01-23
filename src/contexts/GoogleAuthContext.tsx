@@ -64,6 +64,38 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isRestoring, setIsRestoring] = useState(false);
   const changeListenerCleanup = useRef<(() => void) | null>(null);
 
+  // Refresh access token - defined first so it can be used in useEffect
+  const refreshAccessToken = useCallback(async (refreshToken: string): Promise<boolean> => {
+    try {
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: GOOGLE_WEB_CLIENT_ID,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      const newTokens: GoogleAuthTokens = {
+        accessToken: data.access_token,
+        refreshToken: refreshToken,
+        idToken: data.id_token,
+        expiresAt: Date.now() + (data.expires_in * 1000),
+      };
+
+      setTokens(newTokens);
+      await setSetting(STORAGE_KEYS.TOKENS, newTokens);
+      return true;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return false;
+    }
+  }, []);
+
   // Start background sync when we have valid tokens
   const startBackgroundSync = useCallback((accessToken: string) => {
     console.log('[GoogleAuth] Starting background sync...');
@@ -74,13 +106,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       changeListenerCleanup.current();
     }
     
-    // Start 5-minute auto-sync
-    startAutoSync(accessToken, 5);
+    // Start 1-minute auto-sync
+    startAutoSync(accessToken, 1);
     
     // Set up real-time change listeners
     changeListenerCleanup.current = setupChangeListeners(accessToken);
     
-    console.log('[GoogleAuth] Background sync started (5-min interval + real-time changes)');
+    console.log('[GoogleAuth] Background sync started (1-min interval + instant changes)');
   }, []);
 
   // Auto-restore data from Google Drive after login
@@ -166,36 +198,6 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [startBackgroundSync]);
 
-  const refreshAccessToken = async (refreshToken: string): Promise<boolean> => {
-    try {
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: GOOGLE_WEB_CLIENT_ID,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
-        }),
-      });
-
-      if (!response.ok) return false;
-
-      const data = await response.json();
-      const newTokens: GoogleAuthTokens = {
-        accessToken: data.access_token,
-        refreshToken: refreshToken,
-        idToken: data.id_token,
-        expiresAt: Date.now() + (data.expires_in * 1000),
-      };
-
-      setTokens(newTokens);
-      await setSetting(STORAGE_KEYS.TOKENS, newTokens);
-      return true;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return false;
-    }
-  };
 
   // Exchange serverAuthCode for access token (needed for Android to get Drive API access)
   const exchangeAuthCodeForTokens = async (serverAuthCode: string): Promise<GoogleAuthTokens | null> => {
