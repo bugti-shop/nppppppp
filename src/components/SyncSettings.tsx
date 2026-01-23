@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, RefreshCw, Check, LogOut, Calendar } from "lucide-react";
+import { Loader2, RefreshCw, Check, LogOut, Calendar, Cloud, CloudOff, Wifi } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/contexts/GoogleAuthContext";
-import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync } from "@/utils/googleDriveSync";
+import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, isSyncActive } from "@/utils/googleDriveSync";
 import { GoogleCalendarSyncManager, getCalendarSyncSettings, setCalendarSyncSettings, GoogleCalendarInfo } from "@/utils/googleCalendarSync";
 import { getSetting, setSetting } from "@/utils/settingsStorage";
 import {
@@ -34,6 +34,12 @@ import logoTickTick from "@/assets/logo-ticktick.png";
 import logoTodoist from "@/assets/logo-todoist.png";
 import logoEvernote from "@/assets/logo-evernote.png";
 
+interface SyncStatus {
+  status: 'synced' | 'syncing' | 'error' | 'idle';
+  timestamp?: string;
+  message?: string;
+}
+
 const SyncSettings = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -42,6 +48,8 @@ const SyncSettings = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [cloudBackupInfo, setCloudBackupInfo] = useState<{ exists: boolean; lastModified?: Date; size?: number } | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ status: 'idle' });
+  const [backgroundSyncActive, setBackgroundSyncActive] = useState(false);
   
   // Calendar sync settings
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
@@ -50,10 +58,28 @@ const SyncSettings = () => {
   const [selectedCalendarId, setSelectedCalendarId] = useState('primary');
   const [loadingCalendars, setLoadingCalendars] = useState(false);
 
+  // Listen for sync status changes
+  useEffect(() => {
+    const handleSyncStatus = (event: CustomEvent<SyncStatus>) => {
+      setSyncStatus(event.detail);
+      if (event.detail.timestamp) {
+        setLastSyncTime(event.detail.timestamp);
+      }
+    };
+
+    window.addEventListener('syncStatusChanged', handleSyncStatus as EventListener);
+    return () => {
+      window.removeEventListener('syncStatusChanged', handleSyncStatus as EventListener);
+    };
+  }, []);
+
   // Load settings and cloud info when authenticated
   useEffect(() => {
     const loadData = async () => {
       if (isAuthenticated && tokens?.accessToken) {
+        // Check if background sync is active
+        setBackgroundSyncActive(isSyncActive());
+        
         // Load calendar sync settings
         const calSettings = await getCalendarSyncSettings();
         setCalendarSyncEnabled(calSettings.enabled);
@@ -80,19 +106,10 @@ const SyncSettings = () => {
         
         // Fetch available calendars
         fetchCalendars();
-        
-        // Start auto sync if enabled
-        if (autoSync) {
-          startAutoSync(tokens.accessToken, 5);
-        }
       }
     };
     
     loadData();
-    
-    return () => {
-      stopAutoSync();
-    };
   }, [isAuthenticated, tokens?.accessToken]);
 
   const fetchCalendars = async () => {
@@ -279,6 +296,22 @@ const SyncSettings = () => {
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Real-time sync status indicator */}
+              {backgroundSyncActive && (
+                <div className="flex items-center gap-2 p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <Wifi className="h-4 w-4 text-green-500" />
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    {t('sync.realtimeSyncActive')}
+                  </span>
+                  {syncStatus.status === 'syncing' && (
+                    <Loader2 className="h-3 w-3 animate-spin text-green-500 ml-auto" />
+                  )}
+                  {syncStatus.status === 'synced' && (
+                    <Check className="h-3 w-3 text-green-500 ml-auto" />
+                  )}
+                </div>
+              )}
 
               {/* Cloud backup status */}
               {cloudBackupInfo && (

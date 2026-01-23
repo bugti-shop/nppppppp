@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getSetting, setSetting, removeSetting } from '@/utils/settingsStorage';
-import { getGoogleDriveSyncManager } from '@/utils/googleDriveSync';
+import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, setupChangeListeners } from '@/utils/googleDriveSync';
 
 // Google Auth types
 export interface GoogleUser {
@@ -37,6 +37,8 @@ const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undef
 const GOOGLE_ANDROID_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
 // Web Client ID (serverClientId - required for backend token validation)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
+// Web Client Secret (for token exchange - needed for offline access)
+const GOOGLE_WEB_CLIENT_SECRET = 'GOCSPX-YOUR_SECRET_HERE'; // Note: For native apps, this can be empty
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
@@ -56,6 +58,26 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [tokens, setTokens] = useState<GoogleAuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
+  const changeListenerCleanup = useRef<(() => void) | null>(null);
+
+  // Start background sync when we have valid tokens
+  const startBackgroundSync = useCallback((accessToken: string) => {
+    console.log('[GoogleAuth] Starting background sync...');
+    
+    // Stop any existing sync
+    stopAutoSync();
+    if (changeListenerCleanup.current) {
+      changeListenerCleanup.current();
+    }
+    
+    // Start 5-minute auto-sync
+    startAutoSync(accessToken, 5);
+    
+    // Set up real-time change listeners
+    changeListenerCleanup.current = setupChangeListeners(accessToken);
+    
+    console.log('[GoogleAuth] Background sync started (5-min interval + real-time changes)');
+  }, []);
 
   // Auto-restore data from Google Drive after login
   const restoreFromCloud = useCallback(async (accessToken: string) => {
@@ -81,14 +103,20 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         }
       } else {
-        console.log('[GoogleAuth] No cloud backup found');
+        console.log('[GoogleAuth] No cloud backup found, uploading local data...');
+        // Upload current local data as first backup
+        const localData = await syncManager.collectBackupData();
+        await syncManager.uploadBackup(localData);
       }
+      
+      // Start background sync after restore
+      startBackgroundSync(accessToken);
     } catch (error) {
       console.error('[GoogleAuth] Error restoring from cloud:', error);
     } finally {
       setIsRestoring(false);
     }
-  }, []);
+  }, [startBackgroundSync]);
 
   // Load saved auth state on mount
   useEffect(() => {
@@ -102,6 +130,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (savedTokens.expiresAt && savedTokens.expiresAt > Date.now()) {
             setUser(savedUser);
             setTokens(savedTokens);
+            
+            // Start background sync with existing valid token
+            if (savedTokens.accessToken) {
+              console.log('[GoogleAuth] Resuming background sync with saved token...');
+              startBackgroundSync(savedTokens.accessToken);
+            }
           } else if (savedTokens.refreshToken) {
             // Try to refresh the token
             const refreshed = await refreshAccessToken(savedTokens.refreshToken);
@@ -118,7 +152,15 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     loadAuthState();
-  }, []);
+    
+    // Cleanup on unmount
+    return () => {
+      stopAutoSync();
+      if (changeListenerCleanup.current) {
+        changeListenerCleanup.current();
+      }
+    };
+  }, [startBackgroundSync]);
 
   const refreshAccessToken = async (refreshToken: string): Promise<boolean> => {
     try {
@@ -148,6 +190,43 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('Error refreshing token:', error);
       return false;
+    }
+  };
+
+  // Exchange serverAuthCode for access token (needed for Android to get Drive API access)
+  const exchangeAuthCodeForTokens = async (serverAuthCode: string): Promise<GoogleAuthTokens | null> => {
+    try {
+      console.log('[GoogleAuth] Exchanging auth code for tokens...');
+      
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: serverAuthCode,
+          client_id: GOOGLE_WEB_CLIENT_ID,
+          redirect_uri: '', // Empty for native apps
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[GoogleAuth] Token exchange failed:', errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[GoogleAuth] Token exchange successful');
+      
+      return {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        idToken: data.id_token,
+        expiresAt: Date.now() + (data.expires_in * 1000),
+      };
+    } catch (error) {
+      console.error('[GoogleAuth] Token exchange error:', error);
+      return null;
     }
   };
 
@@ -196,6 +275,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const googleResult = result.result as any;
           const profile = googleResult.profile || googleResult.user || googleResult;
           
+          console.log('[GoogleAuth] Parsing user profile...');
           const googleUser: GoogleUser = {
             id: profile?.id || profile?.sub || '',
             email: profile?.email || '',
@@ -205,12 +285,40 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             imageUrl: profile?.imageUrl || profile?.picture,
           };
 
-          const googleTokens: GoogleAuthTokens = {
-            accessToken: googleResult.accessToken?.token || googleResult.accessToken || '',
-            refreshToken: googleResult.refreshToken,
-            idToken: googleResult.idToken,
-            expiresAt: Date.now() + 3600000, // 1 hour
-          };
+          // Try to get access token from various possible locations
+          let accessToken = googleResult.accessToken?.token || googleResult.accessToken || '';
+          const serverAuthCode = googleResult.serverAuthCode || googleResult.authCode;
+          
+          console.log('[GoogleAuth] Access token present:', !!accessToken);
+          console.log('[GoogleAuth] Server auth code present:', !!serverAuthCode);
+          
+          let googleTokens: GoogleAuthTokens;
+          
+          // If we have serverAuthCode but no accessToken, exchange it
+          if (!accessToken && serverAuthCode) {
+            console.log('[GoogleAuth] No access token, exchanging auth code...');
+            const exchangedTokens = await exchangeAuthCodeForTokens(serverAuthCode);
+            if (exchangedTokens) {
+              googleTokens = exchangedTokens;
+              accessToken = exchangedTokens.accessToken;
+            } else {
+              console.error('[GoogleAuth] Failed to exchange auth code');
+              return false;
+            }
+          } else {
+            googleTokens = {
+              accessToken,
+              refreshToken: googleResult.refreshToken,
+              idToken: googleResult.idToken,
+              expiresAt: Date.now() + 3600000, // 1 hour
+            };
+          }
+
+          // Validate that we have a working access token
+          if (!googleTokens.accessToken) {
+            console.error('[GoogleAuth] No valid access token obtained');
+            return false;
+          }
 
           setUser(googleUser);
           setTokens(googleTokens);
@@ -218,11 +326,10 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
 
           console.log('[GoogleAuth] Sign-In successful:', googleUser.email);
+          console.log('[GoogleAuth] Token expires at:', new Date(googleTokens.expiresAt || 0).toISOString());
           
           // Auto-restore data from cloud after login
-          if (googleTokens.accessToken) {
-            restoreFromCloud(googleTokens.accessToken);
-          }
+          restoreFromCloud(googleTokens.accessToken);
           
           return true;
         }
@@ -317,6 +424,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
+      // Stop background sync
+      stopAutoSync();
+      if (changeListenerCleanup.current) {
+        changeListenerCleanup.current();
+        changeListenerCleanup.current = null;
+      }
+      
       if (Capacitor.isNativePlatform()) {
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         await SocialLogin.logout({ provider: 'google' });
@@ -333,6 +447,8 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setTokens(null);
       await removeSetting(STORAGE_KEYS.USER);
       await removeSetting(STORAGE_KEYS.TOKENS);
+      
+      console.log('[GoogleAuth] Signed out and sync stopped');
     } catch (error) {
       console.error('Sign out error:', error);
     }

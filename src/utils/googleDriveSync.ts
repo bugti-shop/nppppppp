@@ -364,23 +364,74 @@ export const stopAutoSync = (): void => {
   }
 };
 
-// Listen for local changes to trigger sync
+// Listen for local changes to trigger sync with proper debouncing
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let isUploading = false;
+
 export const setupChangeListeners = (accessToken: string): () => void => {
   const handleChange = async () => {
-    const manager = getGoogleDriveSyncManager(accessToken);
-    // Debounce: wait 2 seconds after last change
-    setTimeout(async () => {
-      await manager.uploadBackup(await manager.collectBackupData());
-    }, 2000);
+    // Clear any existing debounce timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    // Debounce: wait 3 seconds after last change before syncing
+    debounceTimer = setTimeout(async () => {
+      if (isUploading) {
+        console.log('[Sync] Upload already in progress, skipping...');
+        return;
+      }
+      
+      try {
+        isUploading = true;
+        console.log('[Sync] Change detected, uploading to cloud...');
+        const manager = getGoogleDriveSyncManager(accessToken);
+        const data = await manager.collectBackupData();
+        const result = await manager.uploadBackup(data);
+        
+        if (result.success) {
+          console.log('[Sync] Upload successful');
+          // Dispatch sync status event
+          window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+            detail: { status: 'synced', timestamp: new Date().toISOString() } 
+          }));
+        } else {
+          console.error('[Sync] Upload failed');
+          window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+            detail: { status: 'error', message: 'Upload failed' } 
+          }));
+        }
+      } catch (error) {
+        console.error('[Sync] Error during upload:', error);
+        window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+          detail: { status: 'error', message: 'Sync error' } 
+        }));
+      } finally {
+        isUploading = false;
+      }
+    }, 3000);
   };
 
+  // Listen for all data change events
   window.addEventListener('notesUpdated', handleChange);
   window.addEventListener('tasksUpdated', handleChange);
   window.addEventListener('foldersUpdated', handleChange);
+  
+  console.log('[Sync] Change listeners set up for real-time sync');
 
   return () => {
     window.removeEventListener('notesUpdated', handleChange);
     window.removeEventListener('tasksUpdated', handleChange);
     window.removeEventListener('foldersUpdated', handleChange);
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    console.log('[Sync] Change listeners removed');
   };
+};
+
+// Check if sync is currently active
+export const isSyncActive = (): boolean => {
+  return autoSyncInterval !== null;
 };
