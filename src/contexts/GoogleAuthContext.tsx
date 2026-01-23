@@ -266,8 +266,6 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (Capacitor.isNativePlatform()) {
         // Native in-app Google Sign-In using @capgo/capacitor-social-login
         const platform = Capacitor.getPlatform();
-        console.log('[GoogleAuth] Starting native sign-in flow...');
-        console.log('[GoogleAuth] Platform:', platform);
         
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         
@@ -280,72 +278,53 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Add iOS-specific configuration
         if (platform === 'ios' && GOOGLE_IOS_CLIENT_ID) {
           googleConfig.iOSClientId = GOOGLE_IOS_CLIENT_ID;
-          console.log('[GoogleAuth] iOS Client ID configured');
         }
-        
-        console.log('[GoogleAuth] Initializing SocialLogin...');
-        console.log('[GoogleAuth] Config:', JSON.stringify(googleConfig, null, 2));
-        console.log('[GoogleAuth] Scopes:', SCOPES_ARRAY);
         
         try {
           await SocialLogin.initialize({
             google: googleConfig,
           });
-          console.log('[GoogleAuth] SocialLogin initialized successfully for', platform);
         } catch (initError: any) {
-          console.error('[GoogleAuth] Initialize error:', initError?.message || initError);
-          console.error('[GoogleAuth] Initialize error details:', JSON.stringify(initError, null, 2));
-          
-          // Check for common errors
+          // Only log critical initialization errors in development
           if (initError?.message?.includes('Cannot find provider')) {
-            console.error('[GoogleAuth] Provider not found - check plugin installation and capacitor.config.ts');
+            console.warn('[GoogleAuth] Provider not found - check plugin installation');
           }
-          if (platform === 'ios' && !GOOGLE_IOS_CLIENT_ID) {
-            console.error('[GoogleAuth] iOS requires iOSClientId - add it in GoogleAuthContext.tsx');
-          }
-          throw initError;
+          return false;
         }
 
-        // Perform native Google login with proper options
-        console.log('[GoogleAuth] Calling SocialLogin.login...');
+        // Perform native Google login
         let result;
         try {
           result = await SocialLogin.login({
             provider: 'google',
             options: {
               scopes: SCOPES_ARRAY,
-              forceRefreshToken: true, // Ensures we get fresh tokens with proper scopes
+              forceRefreshToken: true,
             },
           });
-          console.log('[GoogleAuth] Login successful');
-          console.log('[GoogleAuth] Login result keys:', Object.keys(result));
-          console.log('[GoogleAuth] Login result:', JSON.stringify(result, null, 2));
         } catch (loginError: any) {
-          console.error('[GoogleAuth] Login error:', loginError?.message || loginError);
-          console.error('[GoogleAuth] Login error code:', loginError?.code);
-          console.error('[GoogleAuth] Full error object:', JSON.stringify(loginError, null, 2));
+          // User cancelled or other expected failures - return silently
+          const errorCode = loginError?.code?.toString() || '';
+          const errorMessage = loginError?.message || '';
           
-          // Handle specific error codes
-          if (loginError?.code === '10' || loginError?.message?.includes('10')) {
-            console.error('[GoogleAuth] Error 10: SHA-1 fingerprint mismatch. Check Google Cloud Console configuration.');
-          } else if (loginError?.code === '12501' || loginError?.message?.includes('cancelled')) {
-            console.log('[GoogleAuth] User cancelled sign-in');
+          // User cancelled (12501 on Android, various on iOS)
+          if (errorCode === '12501' || errorMessage.includes('cancelled') || errorMessage.includes('canceled')) {
+            return false;
           }
-          throw loginError;
+          
+          // SHA-1 mismatch - log for developer
+          if (errorCode === '10' || errorMessage.includes('10')) {
+            console.warn('[GoogleAuth] SHA-1 fingerprint mismatch');
+          }
+          
+          return false;
         }
         
         if (result.provider === 'google' && result.result) {
           const googleResult = result.result as any;
           
-          // Log the full result structure to debug token extraction
-          console.log('[GoogleAuth] Full googleResult keys:', Object.keys(googleResult));
-          console.log('[GoogleAuth] accessToken type:', typeof googleResult.accessToken);
-          console.log('[GoogleAuth] idToken present:', !!googleResult.idToken);
-          
           // Extract profile from various possible locations in the response
           const profile = googleResult.profile || googleResult.user || googleResult;
-          
-          console.log('[GoogleAuth] Profile keys:', Object.keys(profile || {}));
           
           const googleUser: GoogleUser = {
             id: profile?.id || profile?.sub || profile?.userId || '',
@@ -372,22 +351,15 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           // Get idToken
           const idToken = googleResult.idToken || googleResult.authentication?.idToken || '';
           
-          console.log('[GoogleAuth] Extracted accessToken:', accessToken ? `${accessToken.substring(0, 20)}...` : 'NONE');
-          console.log('[GoogleAuth] Extracted serverAuthCode:', serverAuthCode ? `${serverAuthCode.substring(0, 20)}...` : 'NONE');
-          console.log('[GoogleAuth] Extracted idToken:', idToken ? 'Present' : 'NONE');
-          
           let googleTokens: GoogleAuthTokens;
           
           // If we have serverAuthCode but no accessToken, exchange it for tokens
           if (!accessToken && serverAuthCode) {
-            console.log('[GoogleAuth] No access token, exchanging auth code for tokens...');
             const exchangedTokens = await exchangeAuthCodeForTokens(serverAuthCode);
             if (exchangedTokens) {
               googleTokens = exchangedTokens;
               accessToken = exchangedTokens.accessToken;
-              console.log('[GoogleAuth] Token exchange successful');
             } else {
-              console.error('[GoogleAuth] Failed to exchange auth code for tokens');
               return false;
             }
           } else if (accessToken) {
@@ -398,27 +370,21 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               expiresAt: Date.now() + 3600000, // 1 hour
             };
           } else {
-            // No accessToken and no serverAuthCode - try to use idToken to get user info
-            console.error('[GoogleAuth] No accessToken or serverAuthCode available');
-            console.log('[GoogleAuth] Attempting to continue with idToken only...');
-            
+            // No accessToken and no serverAuthCode - try to use idToken only
             if (idToken) {
               // For now, we can still authenticate the user but sync won't work
               googleTokens = {
-                accessToken: '', // Empty - will need to request again
+                accessToken: '',
                 idToken,
                 expiresAt: Date.now() + 3600000,
               };
-              console.warn('[GoogleAuth] Warning: No accessToken - Google Drive sync will not work');
             } else {
-              console.error('[GoogleAuth] No tokens available at all');
               return false;
             }
           }
 
           // Final validation
           if (!googleTokens.accessToken && !googleTokens.idToken) {
-            console.error('[GoogleAuth] No valid tokens obtained');
             return false;
           }
 
@@ -426,16 +392,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setTokens(googleTokens);
           await setSetting(STORAGE_KEYS.USER, googleUser);
           await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
-
-          console.log('[GoogleAuth] Sign-In successful:', googleUser.email);
-          console.log('[GoogleAuth] Token expires at:', new Date(googleTokens.expiresAt || 0).toISOString());
           
           // Auto-restore data from cloud after login
           restoreFromCloud(googleTokens.accessToken);
           
           return true;
         }
-        console.warn('[GoogleAuth] No valid result received');
         return false;
       } else {
         // Web OAuth flow
@@ -517,7 +479,6 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
     } catch (error) {
-      console.error('Sign in error:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -535,8 +496,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       
       if (Capacitor.isNativePlatform()) {
-        const { SocialLogin } = await import('@capgo/capacitor-social-login');
-        await SocialLogin.logout({ provider: 'google' });
+        try {
+          const { SocialLogin } = await import('@capgo/capacitor-social-login');
+          await SocialLogin.logout({ provider: 'google' });
+        } catch {
+          // Ignore logout errors
+        }
       }
 
       // Revoke token if we have one
@@ -550,10 +515,8 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setTokens(null);
       await removeSetting(STORAGE_KEYS.USER);
       await removeSetting(STORAGE_KEYS.TOKENS);
-      
-      console.log('[GoogleAuth] Signed out and sync stopped');
-    } catch (error) {
-      console.error('Sign out error:', error);
+    } catch {
+      // Silent error handling for sign-out
     }
   }, [tokens]);
 

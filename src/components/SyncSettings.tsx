@@ -158,13 +158,9 @@ const SyncSettings = () => {
         title: t('sync.signedIn'),
         description: t('sync.signedInDesc'),
       });
-    } else {
-      toast({
-        title: t('errors.generic'),
-        description: t('sync.signInFailed'),
-        variant: "destructive",
-      });
     }
+    // No error toast - user cancellation and other issues are handled silently
+    // The context already logs errors for debugging
   };
 
   const handleSignOut = async () => {
