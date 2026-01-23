@@ -1420,6 +1420,8 @@
     "dataUploaded": "Your data has been backed up to the cloud",
     "dataDownloaded": "Your data has been restored from the cloud",
     "alreadySynced": "Everything is already in sync",
+    "restoringData": "Restoring your data...",
+    "restoringDataDesc": "Downloading and restoring your notes, tasks, and folders from cloud backup",
     "syncFailed": "Sync Failed",
     "cloudBackup": "Cloud Backup",
     "available": "Available",

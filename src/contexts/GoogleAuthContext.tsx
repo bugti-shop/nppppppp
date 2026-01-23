@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getSetting, setSetting, removeSetting } from '@/utils/settingsStorage';
+import { getGoogleDriveSyncManager } from '@/utils/googleDriveSync';
 
 // Google Auth types
 export interface GoogleUser {
@@ -24,6 +25,7 @@ interface GoogleAuthContextType {
   tokens: GoogleAuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isRestoring: boolean;
   signIn: () => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshTokens: () => Promise<boolean>;
@@ -53,6 +55,40 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [tokens, setTokens] = useState<GoogleAuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Auto-restore data from Google Drive after login
+  const restoreFromCloud = useCallback(async (accessToken: string) => {
+    try {
+      setIsRestoring(true);
+      console.log('[GoogleAuth] Checking for cloud backup...');
+      
+      const syncManager = getGoogleDriveSyncManager(accessToken);
+      const backupInfo = await syncManager.getCloudBackupInfo();
+      
+      if (backupInfo?.exists) {
+        console.log('[GoogleAuth] Cloud backup found, downloading...');
+        const backup = await syncManager.downloadBackup();
+        
+        if (backup) {
+          console.log('[GoogleAuth] Restoring data from cloud backup...');
+          const restored = await syncManager.restoreFromBackup(backup);
+          
+          if (restored) {
+            console.log('[GoogleAuth] Data restored successfully!');
+          } else {
+            console.warn('[GoogleAuth] Failed to restore data');
+          }
+        }
+      } else {
+        console.log('[GoogleAuth] No cloud backup found');
+      }
+    } catch (error) {
+      console.error('[GoogleAuth] Error restoring from cloud:', error);
+    } finally {
+      setIsRestoring(false);
+    }
+  }, []);
 
   // Load saved auth state on mount
   useEffect(() => {
@@ -182,6 +218,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
 
           console.log('[GoogleAuth] Sign-In successful:', googleUser.email);
+          
+          // Auto-restore data from cloud after login
+          if (googleTokens.accessToken) {
+            restoreFromCloud(googleTokens.accessToken);
+          }
+          
           return true;
         }
         console.warn('[GoogleAuth] No valid result received');
@@ -237,6 +279,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 setTokens(googleTokens);
                 await setSetting(STORAGE_KEYS.USER, googleUser);
                 await setSetting(STORAGE_KEYS.TOKENS, googleTokens);
+
+                // Auto-restore data from cloud after login
+                if (accessToken) {
+                  restoreFromCloud(accessToken);
+                }
 
                 resolve(true);
               } else {
@@ -301,6 +348,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     tokens,
     isAuthenticated: !!user && !!tokens,
     isLoading,
+    isRestoring,
     signIn,
     signOut,
     refreshTokens,

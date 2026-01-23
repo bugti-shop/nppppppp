@@ -37,7 +37,7 @@ import logoEvernote from "@/assets/logo-evernote.png";
 const SyncSettings = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { user, tokens, isAuthenticated, isLoading: authLoading, signIn, signOut } = useGoogleAuth();
+  const { user, tokens, isAuthenticated, isLoading: authLoading, isRestoring, signIn, signOut } = useGoogleAuth();
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -247,6 +247,17 @@ const SyncSettings = () => {
         <CardContent className="space-y-4">
           {isAuthenticated && user ? (
             <>
+              {/* Restoring data indicator */}
+              {isRestoring && (
+                <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{t('sync.restoringData')}</p>
+                    <p className="text-xs text-muted-foreground">{t('sync.restoringDataDesc')}</p>
+                  </div>
+                </div>
+              )}
+
               {/* User info */}
               <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                 {user.imageUrl ? (
