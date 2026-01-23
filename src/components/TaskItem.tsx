@@ -158,8 +158,8 @@ const SubtaskWithNested = ({ subtask, parentId, onUpdateSubtask, hasNestedSubtas
             {subtask.subtasks!.map((nested) => (
               <div
                 key={nested.id}
-                className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/20 transition-colors"
-                style={{ borderLeftColor: getPriorityBorderColor(nested.priority), borderLeftWidth: '2px' }}
+                className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/20 transition-colors border-l-2"
+                style={{ borderLeftColor: getPriorityBorderColor(nested.priority) }}
               >
                 <Checkbox
                   checked={nested.completed}
