@@ -1434,7 +1434,9 @@
     "addToCalendar": "Add to Google Calendar",
     "addToCalendarQuestion": "Would you like to add this task to your Google Calendar?",
     "eventCreated": "Event created in Google Calendar",
-    "eventCreateFailed": "Failed to create calendar event"
+    "eventCreateFailed": "Failed to create calendar event",
+    "realtimeSyncActive": "Real-time sync active",
+    "crossPlatformSync": "Changes sync across all your devices automatically"
   },
   "welcome": {
     "startJourney": "Start Your Productivity Journey",

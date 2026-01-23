@@ -1032,7 +1032,9 @@
     "selectCalendar": "کیلنڈر منتخب کریں",
     "calendarSyncEnabled": "کیلنڈر سنک فعال ہوگئی",
     "eventsImported": "{{count}} ایونٹس درآمد ہوگئے",
-    "syncWithCalendar": "Google Calendar کے ساتھ ٹاسکس سنک کریں"
+    "syncWithCalendar": "Google Calendar کے ساتھ ٹاسکس سنک کریں",
+    "realtimeSyncActive": "ریئل ٹائم سنک فعال ہے",
+    "crossPlatformSync": "تمام ڈیوائسز پر تبدیلیاں خودکار طور پر سنک ہوتی ہیں"
   },
   "welcome": {
     "startJourney": "اپنا پیداواری سفر شروع کریں",
