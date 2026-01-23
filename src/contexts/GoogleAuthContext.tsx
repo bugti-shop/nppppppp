@@ -33,20 +33,19 @@ interface GoogleAuthContextType {
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
 
-// Android Client ID (for native Android sign-in)
-const GOOGLE_ANDROID_CLIENT_ID = '52777395492-u1ftmivj74c038qt6gs4c6fc7bsti5ij.apps.googleusercontent.com';
-// Web Client ID (serverClientId - required for backend token validation)
+// Web Client ID (serverClientId - required for backend token validation and native sign-in)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
-// Web Client Secret (for token exchange - needed for offline access)
-const GOOGLE_WEB_CLIENT_SECRET = 'GOCSPX-YOUR_SECRET_HERE'; // Note: For native apps, this can be empty
 
-const SCOPES = [
+// Scopes for Google APIs - using array format for Capgo plugin
+const SCOPES_ARRAY = [
+  'profile',
+  'email',
+  'https://www.googleapis.com/auth/drive.appdata',
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.calendars',
-  'https://www.googleapis.com/auth/drive.appdata',
-  'profile',
-  'email'
-].join(' ');
+];
+
+const SCOPES = SCOPES_ARRAY.join(' ');
 
 const STORAGE_KEYS = {
   USER: 'google_user',
@@ -236,87 +235,147 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (Capacitor.isNativePlatform()) {
         // Native in-app Google Sign-In using @capgo/capacitor-social-login
         console.log('[GoogleAuth] Starting native sign-in flow...');
+        console.log('[GoogleAuth] Platform:', Capacitor.getPlatform());
         
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         
-        // Initialize the plugin with Web Client ID as serverClientId
-        console.log('[GoogleAuth] Initializing SocialLogin with webClientId:', GOOGLE_WEB_CLIENT_ID);
+        // Initialize the plugin with proper configuration for Android
+        console.log('[GoogleAuth] Initializing SocialLogin...');
+        console.log('[GoogleAuth] WebClientId:', GOOGLE_WEB_CLIENT_ID);
+        console.log('[GoogleAuth] Scopes:', SCOPES_ARRAY);
         
         try {
           await SocialLogin.initialize({
             google: {
               webClientId: GOOGLE_WEB_CLIENT_ID,
+              mode: 'online', // Use online mode to get accessToken directly
             },
           });
           console.log('[GoogleAuth] SocialLogin initialized successfully');
         } catch (initError: any) {
           console.error('[GoogleAuth] Initialize error:', initError?.message || initError);
+          console.error('[GoogleAuth] Initialize error details:', JSON.stringify(initError, null, 2));
+          
+          // Check for common errors
+          if (initError?.message?.includes('Cannot find provider')) {
+            console.error('[GoogleAuth] Provider not found - check plugin installation and capacitor.config.ts');
+          }
           throw initError;
         }
 
-        // Perform native Google login
+        // Perform native Google login with proper options
         console.log('[GoogleAuth] Calling SocialLogin.login...');
         let result;
         try {
           result = await SocialLogin.login({
             provider: 'google',
             options: {
-              scopes: SCOPES.split(' '),
+              scopes: SCOPES_ARRAY,
+              forceRefreshToken: true, // Ensures we get fresh tokens with proper scopes
             },
           });
+          console.log('[GoogleAuth] Login successful');
+          console.log('[GoogleAuth] Login result keys:', Object.keys(result));
           console.log('[GoogleAuth] Login result:', JSON.stringify(result, null, 2));
         } catch (loginError: any) {
           console.error('[GoogleAuth] Login error:', loginError?.message || loginError);
+          console.error('[GoogleAuth] Login error code:', loginError?.code);
           console.error('[GoogleAuth] Full error object:', JSON.stringify(loginError, null, 2));
+          
+          // Handle specific error codes
+          if (loginError?.code === '10' || loginError?.message?.includes('10')) {
+            console.error('[GoogleAuth] Error 10: SHA-1 fingerprint mismatch. Check Google Cloud Console configuration.');
+          } else if (loginError?.code === '12501' || loginError?.message?.includes('cancelled')) {
+            console.log('[GoogleAuth] User cancelled sign-in');
+          }
           throw loginError;
         }
         
         if (result.provider === 'google' && result.result) {
           const googleResult = result.result as any;
+          
+          // Log the full result structure to debug token extraction
+          console.log('[GoogleAuth] Full googleResult keys:', Object.keys(googleResult));
+          console.log('[GoogleAuth] accessToken type:', typeof googleResult.accessToken);
+          console.log('[GoogleAuth] idToken present:', !!googleResult.idToken);
+          
+          // Extract profile from various possible locations in the response
           const profile = googleResult.profile || googleResult.user || googleResult;
           
-          console.log('[GoogleAuth] Parsing user profile...');
+          console.log('[GoogleAuth] Profile keys:', Object.keys(profile || {}));
+          
           const googleUser: GoogleUser = {
-            id: profile?.id || profile?.sub || '',
+            id: profile?.id || profile?.sub || profile?.userId || '',
             email: profile?.email || '',
-            name: profile?.name || profile?.displayName || '',
-            givenName: profile?.givenName || profile?.given_name,
-            familyName: profile?.familyName || profile?.family_name,
-            imageUrl: profile?.imageUrl || profile?.picture,
+            name: profile?.name || profile?.displayName || profile?.givenName || '',
+            givenName: profile?.givenName || profile?.given_name || profile?.firstName,
+            familyName: profile?.familyName || profile?.family_name || profile?.lastName,
+            imageUrl: profile?.imageUrl || profile?.picture || profile?.photoUrl,
           };
 
-          // Try to get access token from various possible locations
-          let accessToken = googleResult.accessToken?.token || googleResult.accessToken || '';
-          const serverAuthCode = googleResult.serverAuthCode || googleResult.authCode;
+          // Extract access token - handle multiple response formats from Capgo plugin
+          let accessToken = '';
+          if (typeof googleResult.accessToken === 'string') {
+            accessToken = googleResult.accessToken;
+          } else if (googleResult.accessToken?.token) {
+            accessToken = googleResult.accessToken.token;
+          } else if (googleResult.authentication?.accessToken) {
+            accessToken = googleResult.authentication.accessToken;
+          }
           
-          console.log('[GoogleAuth] Access token present:', !!accessToken);
-          console.log('[GoogleAuth] Server auth code present:', !!serverAuthCode);
+          // Check for serverAuthCode (offline mode or when scopes require server exchange)
+          const serverAuthCode = googleResult.serverAuthCode || googleResult.authCode || googleResult.authentication?.serverAuthCode;
+          
+          // Get idToken
+          const idToken = googleResult.idToken || googleResult.authentication?.idToken || '';
+          
+          console.log('[GoogleAuth] Extracted accessToken:', accessToken ? `${accessToken.substring(0, 20)}...` : 'NONE');
+          console.log('[GoogleAuth] Extracted serverAuthCode:', serverAuthCode ? `${serverAuthCode.substring(0, 20)}...` : 'NONE');
+          console.log('[GoogleAuth] Extracted idToken:', idToken ? 'Present' : 'NONE');
           
           let googleTokens: GoogleAuthTokens;
           
-          // If we have serverAuthCode but no accessToken, exchange it
+          // If we have serverAuthCode but no accessToken, exchange it for tokens
           if (!accessToken && serverAuthCode) {
-            console.log('[GoogleAuth] No access token, exchanging auth code...');
+            console.log('[GoogleAuth] No access token, exchanging auth code for tokens...');
             const exchangedTokens = await exchangeAuthCodeForTokens(serverAuthCode);
             if (exchangedTokens) {
               googleTokens = exchangedTokens;
               accessToken = exchangedTokens.accessToken;
+              console.log('[GoogleAuth] Token exchange successful');
             } else {
-              console.error('[GoogleAuth] Failed to exchange auth code');
+              console.error('[GoogleAuth] Failed to exchange auth code for tokens');
               return false;
             }
-          } else {
+          } else if (accessToken) {
             googleTokens = {
               accessToken,
-              refreshToken: googleResult.refreshToken,
-              idToken: googleResult.idToken,
+              refreshToken: googleResult.refreshToken || googleResult.authentication?.refreshToken,
+              idToken,
               expiresAt: Date.now() + 3600000, // 1 hour
             };
+          } else {
+            // No accessToken and no serverAuthCode - try to use idToken to get user info
+            console.error('[GoogleAuth] No accessToken or serverAuthCode available');
+            console.log('[GoogleAuth] Attempting to continue with idToken only...');
+            
+            if (idToken) {
+              // For now, we can still authenticate the user but sync won't work
+              googleTokens = {
+                accessToken: '', // Empty - will need to request again
+                idToken,
+                expiresAt: Date.now() + 3600000,
+              };
+              console.warn('[GoogleAuth] Warning: No accessToken - Google Drive sync will not work');
+            } else {
+              console.error('[GoogleAuth] No tokens available at all');
+              return false;
+            }
           }
 
-          // Validate that we have a working access token
-          if (!googleTokens.accessToken) {
-            console.error('[GoogleAuth] No valid access token obtained');
+          // Final validation
+          if (!googleTokens.accessToken && !googleTokens.idToken) {
+            console.error('[GoogleAuth] No valid tokens obtained');
             return false;
           }
 
