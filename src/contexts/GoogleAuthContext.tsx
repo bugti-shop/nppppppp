@@ -36,6 +36,11 @@ const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undef
 // Web Client ID (serverClientId - required for backend token validation and native sign-in)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
 
+// iOS Client ID - Create this in Google Cloud Console for iOS app
+// To get this: Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID → iOS
+// Bundle ID must match your app: app.lovable.c4920824037c4205bb9ed6cc0d5a0385
+const GOOGLE_IOS_CLIENT_ID = ''; // Add your iOS Client ID here when available
+
 // Scopes for Google APIs - using array format for Capgo plugin
 const SCOPES_ARRAY = [
   'profile',
@@ -234,24 +239,33 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       if (Capacitor.isNativePlatform()) {
         // Native in-app Google Sign-In using @capgo/capacitor-social-login
+        const platform = Capacitor.getPlatform();
         console.log('[GoogleAuth] Starting native sign-in flow...');
-        console.log('[GoogleAuth] Platform:', Capacitor.getPlatform());
+        console.log('[GoogleAuth] Platform:', platform);
         
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         
-        // Initialize the plugin with proper configuration for Android
+        // Build platform-specific configuration
+        const googleConfig: any = {
+          webClientId: GOOGLE_WEB_CLIENT_ID,
+          mode: 'online', // Use online mode to get accessToken directly
+        };
+        
+        // Add iOS-specific configuration
+        if (platform === 'ios' && GOOGLE_IOS_CLIENT_ID) {
+          googleConfig.iOSClientId = GOOGLE_IOS_CLIENT_ID;
+          console.log('[GoogleAuth] iOS Client ID configured');
+        }
+        
         console.log('[GoogleAuth] Initializing SocialLogin...');
-        console.log('[GoogleAuth] WebClientId:', GOOGLE_WEB_CLIENT_ID);
+        console.log('[GoogleAuth] Config:', JSON.stringify(googleConfig, null, 2));
         console.log('[GoogleAuth] Scopes:', SCOPES_ARRAY);
         
         try {
           await SocialLogin.initialize({
-            google: {
-              webClientId: GOOGLE_WEB_CLIENT_ID,
-              mode: 'online', // Use online mode to get accessToken directly
-            },
+            google: googleConfig,
           });
-          console.log('[GoogleAuth] SocialLogin initialized successfully');
+          console.log('[GoogleAuth] SocialLogin initialized successfully for', platform);
         } catch (initError: any) {
           console.error('[GoogleAuth] Initialize error:', initError?.message || initError);
           console.error('[GoogleAuth] Initialize error details:', JSON.stringify(initError, null, 2));
@@ -259,6 +273,9 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           // Check for common errors
           if (initError?.message?.includes('Cannot find provider')) {
             console.error('[GoogleAuth] Provider not found - check plugin installation and capacitor.config.ts');
+          }
+          if (platform === 'ios' && !GOOGLE_IOS_CLIENT_ID) {
+            console.error('[GoogleAuth] iOS requires iOSClientId - add it in GoogleAuthContext.tsx');
           }
           throw initError;
         }
