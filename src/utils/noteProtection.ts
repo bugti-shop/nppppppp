@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { NativeBiometric, BiometryType } from 'capacitor-native-biometric';
 import i18n from '@/i18n';
 import { getSetting, setSetting, removeSetting } from './settingsStorage';
 
@@ -30,61 +29,21 @@ export interface BiometricStatus {
 }
 
 // Check if biometric authentication is available
+// Note: Biometric plugin was removed - always returns unavailable
 export const checkBiometricAvailability = async (): Promise<BiometricStatus> => {
-  if (!Capacitor.isNativePlatform()) {
-    return { isAvailable: false, biometryType: 'none' };
-  }
-
-  try {
-    const result = await NativeBiometric.isAvailable();
-    let biometryType: 'fingerprint' | 'face' | 'iris' | 'none' = 'none';
-    
-    if (result.isAvailable) {
-      switch (result.biometryType) {
-        case BiometryType.FACE_ID:
-        case BiometryType.FACE_AUTHENTICATION:
-          biometryType = 'face';
-          break;
-        case BiometryType.FINGERPRINT:
-        case BiometryType.TOUCH_ID:
-          biometryType = 'fingerprint';
-          break;
-        case BiometryType.IRIS_AUTHENTICATION:
-          biometryType = 'iris';
-          break;
-        default:
-          biometryType = 'fingerprint';
-      }
-    }
-
-    return { isAvailable: result.isAvailable, biometryType };
-  } catch (error) {
-    console.error('Error checking biometric availability:', error);
-    return { isAvailable: false, biometryType: 'none' };
-  }
+  // Biometric authentication is not currently available
+  // The capacitor-native-biometric plugin was removed due to compatibility issues
+  console.log('Biometric authentication not available - plugin removed');
+  return { isAvailable: false, biometryType: 'none' };
 };
 
 // Authenticate using biometrics
+// Note: Biometric plugin was removed - always returns false
 export const authenticateWithBiometric = async (reason?: string): Promise<boolean> => {
-  if (!Capacitor.isNativePlatform()) {
-    return false;
-  }
-
-  const t = i18n.t.bind(i18n);
-  const defaultReason = t('biometric.unlockProtectedContent');
-
-  try {
-    await NativeBiometric.verifyIdentity({
-      reason: reason || defaultReason,
-      title: t('biometric.authenticationRequired'),
-      subtitle: t('biometric.verifyIdentity'),
-      description: reason || defaultReason,
-    });
-    return true;
-  } catch (error) {
-    console.error('Biometric authentication failed:', error);
-    return false;
-  }
+  // Biometric authentication is not currently available
+  // The capacitor-native-biometric plugin was removed due to compatibility issues
+  console.log('Biometric authentication not available - plugin removed');
+  return false;
 };
 
 // Generate a random salt for password hashing
