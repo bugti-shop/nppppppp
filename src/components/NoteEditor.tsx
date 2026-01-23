@@ -181,7 +181,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setContent(note.content);
       setColor(note.color || 'yellow');
       setImages(note.images || []);
-      setVoiceRecordings(note.voiceRecordings);
+      setVoiceRecordings(note.voiceRecordings || []);
       setSelectedFolderId(note.folderId);
       setFontFamily(note.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
       setFontSize(note.fontSize || '16px');

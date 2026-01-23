@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Confetti from 'react-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, CheckSquare, Mic, Unlock, Bell, Crown, Loader2, CloudIcon } from 'lucide-react';
+import { FileText, CheckSquare, Mic, Unlock, Bell, Crown, Loader2 } from 'lucide-react';
 import Welcome from '@/components/Welcome';
 import featureHome from '@/assets/feature-home.png';
 import featureNotes from '@/assets/feature-notes.png';
@@ -47,6 +47,7 @@ import { PRICING_DISPLAY } from '@/lib/billing';
 import { Capacitor } from '@capacitor/core';
 import { triggerHaptic } from '@/utils/haptics';
 import { useGoogleAuth } from '@/contexts/GoogleAuthContext';
+import { useRevenueCat } from '@/contexts/RevenueCatContext';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -57,6 +58,7 @@ export default function OnboardingFlow({
 }: OnboardingFlowProps) {
   const { t } = useTranslation();
   const { signIn, isAuthenticated, user, isLoading: isGoogleLoading } = useGoogleAuth();
+  const { isPro, checkEntitlement } = useRevenueCat();
   const [showWelcome, setShowWelcome] = useState(true);
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState('');
@@ -257,9 +259,20 @@ export default function OnboardingFlow({
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     try {
-      await signIn();
-      // After successful sign in, continue to next step
-      handleContinue();
+      const success = await signIn();
+      if (success) {
+        // Check if user already has an active subscription
+        const hasActiveSubscription = await checkEntitlement();
+        
+        if (hasActiveSubscription) {
+          // User is already a paid subscriber, skip paywall and go directly to app
+          console.log('[Onboarding] User has active subscription, skipping paywall');
+          onComplete();
+        } else {
+          // User is not subscribed, continue to next step (paywall)
+          handleContinue();
+        }
+      }
     } catch (error) {
       console.error('Google sign in failed:', error);
     } finally {
@@ -1756,7 +1769,7 @@ export default function OnboardingFlow({
             className="mt-8 text-center flex flex-col items-center"
           >
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-              <CloudIcon className="w-10 h-10 text-primary" />
+              <img src={googleLogo} alt="Google Drive" className="w-10 h-10" />
             </div>
             
             <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('onboarding.googleSync.title', 'Sync Your Data')}</h1>
