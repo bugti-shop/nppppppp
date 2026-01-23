@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Capacitor } from '@capacitor/core';
 import { getSetting, setSetting, removeSetting } from '@/utils/settingsStorage';
 import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, setupChangeListeners } from '@/utils/googleDriveSync';
+import { startCalendarAutoSync, stopCalendarAutoSync } from '@/utils/calendarBidirectionalSync';
+import { getCalendarSyncSettings } from '@/utils/googleCalendarSync';
 
 // Google Auth types
 export interface GoogleUser {
@@ -97,22 +99,34 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   // Start background sync when we have valid tokens
-  const startBackgroundSync = useCallback((accessToken: string) => {
+  const startBackgroundSync = useCallback(async (accessToken: string) => {
     console.log('[GoogleAuth] Starting background sync...');
     
     // Stop any existing sync
     stopAutoSync();
+    stopCalendarAutoSync();
     if (changeListenerCleanup.current) {
       changeListenerCleanup.current();
     }
     
-    // Start 1-minute auto-sync
+    // Start 1-minute auto-sync for Drive backup
     startAutoSync(accessToken, 1);
     
     // Set up real-time change listeners
     changeListenerCleanup.current = setupChangeListeners(accessToken);
     
-    console.log('[GoogleAuth] Background sync started (1-min interval + instant changes)');
+    // Start Calendar bidirectional sync (5-min interval + instant on task change)
+    try {
+      const calendarSettings = await getCalendarSyncSettings();
+      if (calendarSettings.enabled) {
+        await startCalendarAutoSync(accessToken, 5);
+        console.log('[GoogleAuth] Calendar bidirectional sync started');
+      }
+    } catch (error) {
+      console.warn('[GoogleAuth] Calendar sync initialization failed:', error);
+    }
+    
+    console.log('[GoogleAuth] Background sync started (1-min interval + instant changes + calendar sync)');
   }, []);
 
   // Auto-restore data from Google Drive after login
@@ -512,8 +526,9 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
-      // Stop background sync
+      // Stop all background sync
       stopAutoSync();
+      stopCalendarAutoSync();
       if (changeListenerCleanup.current) {
         changeListenerCleanup.current();
         changeListenerCleanup.current = null;

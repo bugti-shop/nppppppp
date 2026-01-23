@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, RefreshCw, Check, LogOut, Calendar, Cloud, CloudOff, Wifi } from "lucide-react";
+import { Loader2, RefreshCw, Check, LogOut, Calendar, Cloud, CloudOff, Wifi, ArrowLeftRight, Download, Upload } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/contexts/GoogleAuthContext";
-import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, isSyncActive, isNetworkOnline } from "@/utils/googleDriveSync";
+import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, isSyncActive } from "@/utils/googleDriveSync";
 import { GoogleCalendarSyncManager, getCalendarSyncSettings, setCalendarSyncSettings, GoogleCalendarInfo } from "@/utils/googleCalendarSync";
+import { startCalendarAutoSync, stopCalendarAutoSync, isCalendarSyncActive, triggerCalendarSync } from "@/utils/calendarBidirectionalSync";
 import { getSetting, setSetting } from "@/utils/settingsStorage";
 import {
   Accordion,
@@ -40,6 +41,13 @@ interface SyncStatus {
   message?: string;
 }
 
+interface CalendarSyncStatus {
+  status: 'synced' | 'syncing' | 'error' | 'idle';
+  imported?: number;
+  exported?: number;
+  timestamp?: string;
+}
+
 const SyncSettings = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -57,6 +65,9 @@ const SyncSettings = () => {
   const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([]);
   const [selectedCalendarId, setSelectedCalendarId] = useState('primary');
   const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const [calendarSyncStatus, setCalendarSyncStatus] = useState<CalendarSyncStatus>({ status: 'idle' });
+  const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
+  const [calendarBidirectionalEnabled, setCalendarBidirectionalEnabled] = useState(false);
 
   // Listen for sync status changes
   useEffect(() => {
@@ -67,9 +78,20 @@ const SyncSettings = () => {
       }
     };
 
+    const handleCalendarSyncStatus = (event: CustomEvent<CalendarSyncStatus>) => {
+      setCalendarSyncStatus(event.detail);
+      if (event.detail.status === 'syncing') {
+        setIsCalendarSyncing(true);
+      } else {
+        setIsCalendarSyncing(false);
+      }
+    };
+
     window.addEventListener('syncStatusChanged', handleSyncStatus as EventListener);
+    window.addEventListener('calendarSyncStatusChanged', handleCalendarSyncStatus as EventListener);
     return () => {
       window.removeEventListener('syncStatusChanged', handleSyncStatus as EventListener);
+      window.removeEventListener('calendarSyncStatusChanged', handleCalendarSyncStatus as EventListener);
     };
   }, []);
 
@@ -84,6 +106,9 @@ const SyncSettings = () => {
         const calSettings = await getCalendarSyncSettings();
         setCalendarSyncEnabled(calSettings.enabled);
         setSelectedCalendarId(calSettings.selectedCalendarId);
+        
+        // Check if bidirectional calendar sync is active
+        setCalendarBidirectionalEnabled(isCalendarSyncActive());
         
         // Load auto sync setting
         const autoSync = await getSetting<boolean>('google_auto_sync_enabled', false);
@@ -216,18 +241,48 @@ const SyncSettings = () => {
     await setCalendarSyncSettings({ enabled });
     
     if (enabled && tokens?.accessToken) {
-      // Perform initial calendar sync
+      // Start bidirectional calendar sync
+      setIsCalendarSyncing(true);
       try {
-        const calManager = new GoogleCalendarSyncManager(tokens.accessToken);
-        const result = await calManager.performFullSync();
+        await startCalendarAutoSync(tokens.accessToken, 5);
+        setCalendarBidirectionalEnabled(true);
         toast({
           title: t('sync.calendarSyncEnabled'),
-          description: t('sync.eventsImported', { count: result.imported }),
+          description: t('sync.bidirectionalSyncStarted'),
         });
       } catch (error) {
         console.error('Calendar sync error:', error);
+        toast({
+          title: t('sync.syncFailed'),
+          description: t('errors.generic'),
+          variant: "destructive",
+        });
       }
+      setIsCalendarSyncing(false);
+    } else {
+      stopCalendarAutoSync();
+      setCalendarBidirectionalEnabled(false);
     }
+  };
+
+  const handleCalendarSyncNow = async () => {
+    if (!tokens?.accessToken) return;
+    
+    setIsCalendarSyncing(true);
+    try {
+      await triggerCalendarSync(tokens.accessToken);
+      toast({
+        title: t('sync.syncComplete'),
+        description: t('sync.calendarSynced'),
+      });
+    } catch (error) {
+      toast({
+        title: t('sync.syncFailed'),
+        description: t('errors.generic'),
+        variant: "destructive",
+      });
+    }
+    setIsCalendarSyncing(false);
   };
 
   const handleCalendarSelect = async (calendarId: string) => {
@@ -411,12 +466,13 @@ const SyncSettings = () => {
             </div>
             <div className="flex-1">
               <CardTitle className="text-lg">{t('sync.googleCalendar')}</CardTitle>
-              <CardDescription>{t('sync.syncWithCalendar')}</CardDescription>
+              <CardDescription>{t('sync.bidirectionalSync')}</CardDescription>
             </div>
             {isAuthenticated && (
               <Switch
                 checked={calendarSyncEnabled}
                 onCheckedChange={handleCalendarSyncToggle}
+                disabled={isCalendarSyncing}
               />
             )}
           </div>
@@ -437,6 +493,49 @@ const SyncSettings = () => {
             </Button>
           ) : calendarSyncEnabled ? (
             <div className="space-y-4">
+              {/* Bidirectional sync status indicator */}
+              {calendarBidirectionalEnabled && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                  calendarSyncStatus.status === 'syncing' 
+                    ? 'bg-blue-500/10 border-blue-500/20' 
+                    : calendarSyncStatus.status === 'synced'
+                    ? 'bg-emerald-500/10 border-emerald-500/20'
+                    : 'bg-muted/50 border-border'
+                }`}>
+                  <ArrowLeftRight className={`h-4 w-4 ${
+                    calendarSyncStatus.status === 'syncing' 
+                      ? 'text-blue-500 animate-pulse' 
+                      : 'text-emerald-500'
+                  }`} />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">
+                      {calendarSyncStatus.status === 'syncing' 
+                        ? t('sync.syncingCalendar')
+                        : t('sync.bidirectionalActive')}
+                    </span>
+                    {calendarSyncStatus.imported !== undefined && calendarSyncStatus.exported !== undefined && (
+                      <div className="flex gap-3 mt-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Download className="h-3 w-3" />
+                          {calendarSyncStatus.imported} {t('sync.imported')}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          {calendarSyncStatus.exported} {t('sync.exported')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {calendarSyncStatus.status === 'syncing' && (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  )}
+                  {calendarSyncStatus.status === 'synced' && (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  )}
+                </div>
+              )}
+
+              {/* Calendar selector */}
               <div className="space-y-2">
                 <Label>{t('sync.selectCalendar')}</Label>
                 <Select value={selectedCalendarId} onValueChange={handleCalendarSelect}>
@@ -467,9 +566,38 @@ const SyncSettings = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Sync now button */}
+              <Button 
+                className="w-full" 
+                onClick={handleCalendarSyncNow}
+                disabled={isCalendarSyncing}
+              >
+                {isCalendarSyncing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                {t('sync.syncCalendarNow')}
+              </Button>
+
+              {/* Sync info */}
+              <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span>{t('sync.importFromCalendar')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <span>{t('sync.exportToCalendar')}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t('sync.calendarSyncInfo')}
+                </p>
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">{t('sync.syncWithCalendar')}</p>
+            <p className="text-sm text-muted-foreground">{t('sync.enableBidirectionalSync')}</p>
           )}
         </CardContent>
       </Card>

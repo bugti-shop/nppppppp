@@ -1438,7 +1438,19 @@
     "realtimeSyncActive": "Real-time sync active",
     "instantSyncActive": "Instant sync active",
     "offlineMode": "Offline - changes will sync when online",
-    "crossPlatformSync": "Changes sync across all your devices automatically"
+    "crossPlatformSync": "Changes sync across all your devices automatically",
+    "bidirectionalSync": "Two-way sync with Google Calendar",
+    "bidirectionalSyncStarted": "Bidirectional sync is now active",
+    "bidirectionalActive": "Two-way sync active",
+    "syncingCalendar": "Syncing with calendar...",
+    "syncCalendarNow": "Sync Calendar Now",
+    "calendarSynced": "Calendar synced successfully",
+    "importFromCalendar": "Import events from Google Calendar as tasks",
+    "exportToCalendar": "Export tasks with due dates to Google Calendar",
+    "calendarSyncInfo": "Changes sync automatically every 5 minutes, and instantly when you create or edit tasks",
+    "enableBidirectionalSync": "Enable to sync tasks and events between the app and Google Calendar",
+    "imported": "imported",
+    "exported": "exported"
   },
   "welcome": {
     "startJourney": "Start Your Productivity Journey",
