@@ -1507,33 +1507,34 @@ export const RichTextEditor = ({
     const audioContainers = editorRef.current.querySelectorAll('.audio-player-container');
     audioContainers.forEach((container) => {
       const containerEl = container as HTMLElement;
-      const audioEl = containerEl.querySelector('audio') as HTMLAudioElement;
+      let audioEl = containerEl.querySelector('audio') as HTMLAudioElement | null;
+      const dataSrc = containerEl.getAttribute('data-audio-src');
       
-      if (!audioEl) {
-        // If audio element is missing, try to recreate from data attributes
-        const audioSrc = containerEl.getAttribute('data-audio-src');
-        if (audioSrc) {
-          const newAudio = document.createElement('audio');
-          newAudio.controls = true;
-          newAudio.src = audioSrc;
-          newAudio.style.width = '100%';
-          newAudio.style.maxWidth = '400px';
-          newAudio.style.height = '54px';
-          containerEl.appendChild(newAudio);
-        }
-        return;
+      // If audio element is missing or has no source, try to recreate from data attributes
+      if (!audioEl && dataSrc) {
+        const newAudio = document.createElement('audio');
+        newAudio.controls = true;
+        newAudio.src = dataSrc;
+        newAudio.style.width = '100%';
+        newAudio.style.maxWidth = '400px';
+        newAudio.style.height = '54px';
+        containerEl.appendChild(newAudio);
+        audioEl = newAudio;
       }
       
-      // Ensure audio element has proper attributes
-      audioEl.controls = true;
-      audioEl.style.width = '100%';
-      audioEl.style.maxWidth = '400px';
-      audioEl.style.height = '54px';
-      
-      // Restore src from data attribute if missing
-      const dataSrc = containerEl.getAttribute('data-audio-src');
-      if (dataSrc && !audioEl.src) {
-        audioEl.src = dataSrc;
+      if (audioEl) {
+        // Ensure audio element has proper attributes
+        audioEl.controls = true;
+        audioEl.style.width = '100%';
+        audioEl.style.maxWidth = '400px';
+        audioEl.style.height = '54px';
+        
+        // Restore src from data attribute if missing or empty
+        // Check both .src and getAttribute('src') since data URLs behave differently
+        const currentSrc = audioEl.src || audioEl.getAttribute('src');
+        if (dataSrc && (!currentSrc || currentSrc === '' || currentSrc === window.location.href)) {
+          audioEl.src = dataSrc;
+        }
       }
       
       // Ensure container styling
@@ -1572,6 +1573,11 @@ export const RichTextEditor = ({
           reattachTableListeners();
           reattachAudioListeners();
         }, 0);
+      } else {
+        // Editor is focused, still reattach audio listeners to ensure they display
+        setTimeout(() => {
+          reattachAudioListeners();
+        }, 0);
       }
     }
   }, [content, reattachImageListeners, reattachTableListeners, reattachAudioListeners]);
@@ -1584,8 +1590,13 @@ export const RichTextEditor = ({
         reattachTableListeners();
         reattachAudioListeners();
       }, 100);
+      
+      // Also reattach after a longer delay for dynamic content loading
+      setTimeout(() => {
+        reattachAudioListeners();
+      }, 500);
     }
-  }, []);
+  }, [content, reattachImageListeners, reattachTableListeners, reattachAudioListeners]);
 
   // Adjust toolbar position when the on-screen keyboard appears using VisualViewport
   useEffect(() => {
