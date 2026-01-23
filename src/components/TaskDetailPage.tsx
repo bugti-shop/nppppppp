@@ -24,10 +24,8 @@ import {
   Plus,
   Calendar as CalendarIcon,
   FileText,
-  Paperclip,
   Tag,
   X,
-  Image as ImageIcon,
   MapPin,
   Link,
   Clock,
@@ -102,7 +100,6 @@ export const TaskDetailPage = ({
   const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | undefined>();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Subtask detail sheet state
   const [selectedSubtask, setSelectedSubtask] = useState<TodoItem | null>(null);
@@ -347,23 +344,6 @@ export const TaskDetailPage = ({
   const handleConvertToNote = () => {
     onConvertToNote(task);
     onClose();
-  };
-
-  const handleAttachment = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      onUpdate({ ...task, imageUrl: dataUrl });
-      toast.success(t('toasts.saved'));
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAddTag = () => {
@@ -911,22 +891,6 @@ export const TaskDetailPage = ({
             <span className="flex-1 text-left">{t('taskDetail.convertToNotes')}</span>
           </button>
 
-          {/* Attachment */}
-          <button 
-            onClick={handleAttachment}
-            className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors"
-          >
-            <Paperclip className="h-5 w-5 text-pink-500" />
-            <span className="flex-1 text-left">{t('taskDetail.attachment')}</span>
-            {task.imageUrl && <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="*/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
 
           {/* Tag */}
           <div className="space-y-2">

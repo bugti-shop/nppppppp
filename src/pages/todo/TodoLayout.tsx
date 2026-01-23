@@ -39,7 +39,7 @@ export const TodoLayout = ({ children, title, searchValue, onSearchChange }: Tod
               <img src={appLogo} alt="Npd" className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0" style={{ minWidth: '28px', minHeight: '28px' }} />
               <h1 className="text-lg sm:text-xl font-bold truncate">{title}</h1>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
               {syncEnabled && (
                 <SyncBadge
                   isOnline={isOnline}
