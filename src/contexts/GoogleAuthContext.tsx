@@ -156,10 +156,14 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Load saved auth state on mount
   useEffect(() => {
+    let isMounted = true;
+    
     const loadAuthState = async () => {
       try {
         const savedUser = await getSetting<GoogleUser | null>(STORAGE_KEYS.USER, null);
         const savedTokens = await getSetting<GoogleAuthTokens | null>(STORAGE_KEYS.TOKENS, null);
+        
+        if (!isMounted) return;
         
         if (savedUser && savedTokens) {
           // Check if token is still valid
@@ -174,16 +178,21 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             }
           } else if (savedTokens.refreshToken) {
             // Try to refresh the token
+            console.log('[GoogleAuth] Token expired, refreshing...');
             const refreshed = await refreshAccessToken(savedTokens.refreshToken);
-            if (refreshed) {
+            if (refreshed && isMounted) {
               setUser(savedUser);
             }
+          } else {
+            console.log('[GoogleAuth] No valid token or refresh token available');
           }
         }
       } catch (error) {
-        console.error('Error loading auth state:', error);
+        console.error('[GoogleAuth] Error loading auth state:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -191,12 +200,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       stopAutoSync();
       if (changeListenerCleanup.current) {
         changeListenerCleanup.current();
       }
     };
-  }, [startBackgroundSync]);
+  }, [startBackgroundSync, refreshAccessToken]);
 
 
   // Exchange serverAuthCode for access token (needed for Android to get Drive API access)
