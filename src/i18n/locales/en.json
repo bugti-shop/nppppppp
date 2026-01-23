@@ -1436,6 +1436,8 @@
     "eventCreated": "Event created in Google Calendar",
     "eventCreateFailed": "Failed to create calendar event",
     "realtimeSyncActive": "Real-time sync active",
+    "instantSyncActive": "Instant sync active",
+    "offlineMode": "Offline - changes will sync when online",
     "crossPlatformSync": "Changes sync across all your devices automatically"
   },
   "welcome": {

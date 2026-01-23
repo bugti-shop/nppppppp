@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleAuth } from "@/contexts/GoogleAuthContext";
-import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, isSyncActive } from "@/utils/googleDriveSync";
+import { getGoogleDriveSyncManager, startAutoSync, stopAutoSync, isSyncActive, isNetworkOnline } from "@/utils/googleDriveSync";
 import { GoogleCalendarSyncManager, getCalendarSyncSettings, setCalendarSyncSettings, GoogleCalendarInfo } from "@/utils/googleCalendarSync";
 import { getSetting, setSetting } from "@/utils/settingsStorage";
 import {
@@ -35,7 +35,7 @@ import logoTodoist from "@/assets/logo-todoist.png";
 import logoEvernote from "@/assets/logo-evernote.png";
 
 interface SyncStatus {
-  status: 'synced' | 'syncing' | 'error' | 'idle';
+  status: 'synced' | 'syncing' | 'error' | 'idle' | 'offline';
   timestamp?: string;
   message?: string;
 }
@@ -299,16 +299,31 @@ const SyncSettings = () => {
 
               {/* Real-time sync status indicator */}
               {backgroundSyncActive && (
-                <div className="flex items-center gap-2 p-2 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <Wifi className="h-4 w-4 text-green-500" />
-                  <span className="text-xs text-green-600 dark:text-green-400">
-                    {t('sync.realtimeSyncActive')}
-                  </span>
-                  {syncStatus.status === 'syncing' && (
-                    <Loader2 className="h-3 w-3 animate-spin text-green-500 ml-auto" />
-                  )}
-                  {syncStatus.status === 'synced' && (
-                    <Check className="h-3 w-3 text-green-500 ml-auto" />
+                <div className={`flex items-center gap-2 p-2 rounded-lg border ${
+                  syncStatus.status === 'offline' 
+                    ? 'bg-orange-500/10 border-orange-500/20' 
+                    : 'bg-emerald-500/10 border-emerald-500/20'
+                }`}>
+                  {syncStatus.status === 'offline' ? (
+                    <>
+                      <CloudOff className="h-4 w-4 text-orange-500" />
+                      <span className="text-xs text-orange-600 dark:text-orange-400">
+                        {t('sync.offlineMode')}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="h-4 w-4 text-emerald-500" />
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                        {t('sync.instantSyncActive')}
+                      </span>
+                      {syncStatus.status === 'syncing' && (
+                        <Loader2 className="h-3 w-3 animate-spin text-emerald-500 ml-auto" />
+                      )}
+                      {syncStatus.status === 'synced' && (
+                        <Check className="h-3 w-3 text-emerald-500 ml-auto" />
+                      )}
+                    </>
                   )}
                 </div>
               )}

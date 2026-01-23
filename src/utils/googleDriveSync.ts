@@ -339,32 +339,79 @@ export const getGoogleDriveSyncManager = (accessToken: string): GoogleDriveSyncM
   return syncManagerInstance;
 };
 
-// Auto-sync interval management
+// Network status tracking
+let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+let pendingSync = false;
+
+// Auto-sync interval management (reduced to 1 minute for faster sync)
 let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
 
-export const startAutoSync = (accessToken: string, intervalMinutes: number = 5): void => {
+export const startAutoSync = (accessToken: string, intervalMinutes: number = 1): void => {
   stopAutoSync();
   
   const sync = async () => {
+    if (!isOnline) {
+      pendingSync = true;
+      console.log('[Sync] Offline - sync pending');
+      return;
+    }
+    
     const manager = getGoogleDriveSyncManager(accessToken);
-    await manager.performSync();
+    const result = await manager.performSync();
+    
+    if (result.success) {
+      window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+        detail: { status: 'synced', timestamp: new Date().toISOString() } 
+      }));
+    }
   };
+
+  // Set up network listeners for instant sync when coming back online
+  const handleOnline = () => {
+    isOnline = true;
+    console.log('[Sync] Back online');
+    if (pendingSync) {
+      console.log('[Sync] Syncing pending changes...');
+      pendingSync = false;
+      sync();
+    }
+  };
+
+  const handleOffline = () => {
+    isOnline = false;
+    console.log('[Sync] Went offline');
+    window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+      detail: { status: 'offline' } 
+    }));
+  };
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
 
   // Initial sync
   sync();
 
-  // Set up interval
+  // Background interval sync (1 minute fallback)
   autoSyncInterval = setInterval(sync, intervalMinutes * 60 * 1000);
+  
+  // Store cleanup functions
+  (autoSyncInterval as any).__cleanup = () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
 };
 
 export const stopAutoSync = (): void => {
   if (autoSyncInterval) {
+    if ((autoSyncInterval as any).__cleanup) {
+      (autoSyncInterval as any).__cleanup();
+    }
     clearInterval(autoSyncInterval);
     autoSyncInterval = null;
   }
 };
 
-// Listen for local changes to trigger sync with proper debouncing
+// Listen for local changes to trigger INSTANT sync
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let isUploading = false;
 
@@ -375,23 +422,33 @@ export const setupChangeListeners = (accessToken: string): () => void => {
       clearTimeout(debounceTimer);
     }
     
-    // Debounce: wait 3 seconds after last change before syncing
+    // Very short debounce (500ms) for instant feel while preventing rapid-fire uploads
     debounceTimer = setTimeout(async () => {
+      if (!isOnline) {
+        console.log('[Sync] Offline - queuing change for later');
+        pendingSync = true;
+        return;
+      }
+      
       if (isUploading) {
-        console.log('[Sync] Upload already in progress, skipping...');
+        console.log('[Sync] Upload in progress, will retry...');
+        pendingSync = true;
         return;
       }
       
       try {
         isUploading = true;
-        console.log('[Sync] Change detected, uploading to cloud...');
+        window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
+          detail: { status: 'syncing' } 
+        }));
+        
+        console.log('[Sync] Instant sync triggered...');
         const manager = getGoogleDriveSyncManager(accessToken);
         const data = await manager.collectBackupData();
         const result = await manager.uploadBackup(data);
         
         if (result.success) {
-          console.log('[Sync] Upload successful');
-          // Dispatch sync status event
+          console.log('[Sync] Instant sync complete');
           window.dispatchEvent(new CustomEvent('syncStatusChanged', { 
             detail: { status: 'synced', timestamp: new Date().toISOString() } 
           }));
@@ -408,8 +465,14 @@ export const setupChangeListeners = (accessToken: string): () => void => {
         }));
       } finally {
         isUploading = false;
+        
+        // If there was a pending change while uploading, sync again
+        if (pendingSync) {
+          pendingSync = false;
+          handleChange();
+        }
       }
-    }, 3000);
+    }, 500); // 500ms debounce for instant sync
   };
 
   // Listen for all data change events
@@ -417,7 +480,7 @@ export const setupChangeListeners = (accessToken: string): () => void => {
   window.addEventListener('tasksUpdated', handleChange);
   window.addEventListener('foldersUpdated', handleChange);
   
-  console.log('[Sync] Change listeners set up for real-time sync');
+  console.log('[Sync] Instant sync listeners active');
 
   return () => {
     window.removeEventListener('notesUpdated', handleChange);
@@ -434,4 +497,9 @@ export const setupChangeListeners = (accessToken: string): () => void => {
 // Check if sync is currently active
 export const isSyncActive = (): boolean => {
   return autoSyncInterval !== null;
+};
+
+// Check network status
+export const isNetworkOnline = (): boolean => {
+  return isOnline;
 };

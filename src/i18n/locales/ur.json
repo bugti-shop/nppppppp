@@ -1034,6 +1034,8 @@
     "eventsImported": "{{count}} ایونٹس درآمد ہوگئے",
     "syncWithCalendar": "Google Calendar کے ساتھ ٹاسکس سنک کریں",
     "realtimeSyncActive": "ریئل ٹائم سنک فعال ہے",
+    "instantSyncActive": "فوری سنک فعال ہے",
+    "offlineMode": "آف لائن - آن لائن ہونے پر تبدیلیاں سنک ہوں گی",
     "crossPlatformSync": "تمام ڈیوائسز پر تبدیلیاں خودکار طور پر سنک ہوتی ہیں"
   },
   "welcome": {
