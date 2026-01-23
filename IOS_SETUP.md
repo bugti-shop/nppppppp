@@ -1,6 +1,6 @@
 # iOS Setup Guide for Npd
 
-This guide covers the required iOS permissions and setup for push notifications, voice recording, and location-based reminders.
+This guide covers the required iOS setup for Google Sign-In, push notifications, voice recording, and location-based reminders.
 
 ## Prerequisites
 
@@ -11,9 +11,60 @@ This guide covers the required iOS permissions and setup for push notifications,
 5. Run `npx cap add ios` to add iOS platform
 6. Run `npx cap sync` to sync the project
 
+## Google Sign-In Setup (Required for Cloud Sync)
+
+### Step 1: Create iOS OAuth Client ID in Google Cloud Console
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your project (same as Android)
+3. Navigate to **APIs & Services → Credentials**
+4. Click **Create Credentials → OAuth client ID**
+5. Select **iOS** as application type
+6. Enter your Bundle ID: `app.lovable.c4920824037c4205bb9ed6cc0d5a0385`
+7. Click **Create**
+8. Copy the **Client ID** (e.g., `52777395492-xxxxx.apps.googleusercontent.com`)
+9. Note the **Reversed Client ID** (e.g., `com.googleusercontent.apps.52777395492-xxxxx`)
+
+### Step 2: Add iOS Client ID to the App
+
+Open `src/contexts/GoogleAuthContext.tsx` and add your iOS Client ID:
+
+```typescript
+const GOOGLE_IOS_CLIENT_ID = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
+```
+
+### Step 3: Update Info.plist with URL Scheme
+
+Add these entries to your `ios/App/App/Info.plist` file inside the `<dict>` tag:
+
+```xml
+<!-- Google Sign-In URL Scheme -->
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <!-- Use your Reversed Client ID -->
+            <string>com.googleusercontent.apps.YOUR_CLIENT_ID_HERE</string>
+        </array>
+    </dict>
+</array>
+
+<!-- Required for Google Sign-In -->
+<key>GIDClientID</key>
+<string>YOUR_IOS_CLIENT_ID.apps.googleusercontent.com</string>
+```
+
+### Step 4: Enable Required APIs in Google Cloud Console
+
+Ensure these APIs are enabled:
+- Google Drive API
+- Google Calendar API
+- Google People API
+
 ## Info.plist Permissions
 
-After running `npx cap add ios`, you need to add the following permissions to your `ios/App/App/Info.plist` file:
+After running `npx cap add ios`, add the following permissions to `ios/App/App/Info.plist`:
 
 ### Required Permission Descriptions
 

@@ -15,7 +15,10 @@ const config: CapacitorConfig = {
     },
     SocialLogin: {
       google: {
+        // Web Client ID - used on Web and as serverClientId on native
         webClientId: '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com',
+        // iOS Client ID - create this in Google Cloud Console for iOS
+        // iOSClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
         mode: 'online',
       },
     },
