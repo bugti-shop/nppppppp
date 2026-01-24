@@ -311,14 +311,21 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     const loadAuthState = async () => {
       try {
+        console.log('[GoogleAuth] Loading saved auth state...');
         const savedUser = await getSetting<GoogleUser | null>(STORAGE_KEYS.USER, null);
         const savedTokens = await getSetting<GoogleAuthTokens | null>(STORAGE_KEYS.TOKENS, null);
         
         if (!isMounted) return;
         
         if (savedUser && savedTokens) {
-          // Check if token is still valid
-          if (savedTokens.expiresAt && savedTokens.expiresAt > Date.now()) {
+          console.log('[GoogleAuth] Found saved credentials for:', savedUser.email);
+          
+          // Check if token is still valid (with 5 min buffer)
+          const bufferTime = 5 * 60 * 1000; // 5 minutes
+          const isTokenValid = savedTokens.expiresAt && (savedTokens.expiresAt - bufferTime) > Date.now();
+          
+          if (isTokenValid) {
+            console.log('[GoogleAuth] Token still valid, restoring session...');
             setUser(savedUser);
             setTokens(savedTokens);
             
@@ -332,11 +339,25 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             console.log('[GoogleAuth] Token expired, refreshing...');
             const refreshed = await refreshAccessToken(savedTokens.refreshToken);
             if (refreshed && isMounted) {
+              // Get the new tokens after refresh
+              const newTokens = await getSetting<GoogleAuthTokens | null>(STORAGE_KEYS.TOKENS, null);
               setUser(savedUser);
+              if (newTokens?.accessToken) {
+                setTokens(newTokens);
+                console.log('[GoogleAuth] Session restored with refreshed token');
+                startBackgroundSync(newTokens.accessToken);
+              }
+            } else {
+              console.log('[GoogleAuth] Token refresh failed, user needs to sign in again');
             }
           } else {
-            console.log('[GoogleAuth] No valid token or refresh token available');
+            console.log('[GoogleAuth] No refresh token available, clearing stale session');
+            // Clear stale data
+            await removeSetting(STORAGE_KEYS.USER);
+            await removeSetting(STORAGE_KEYS.TOKENS);
           }
+        } else {
+          console.log('[GoogleAuth] No saved credentials found');
         }
       } catch (error) {
         console.error('[GoogleAuth] Error loading auth state:', error);
