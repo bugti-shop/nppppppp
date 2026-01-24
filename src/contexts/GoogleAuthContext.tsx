@@ -55,7 +55,7 @@ const STORAGE_KEYS = {
 };
 
 // Custom URL scheme for deep linking (matches capacitor.config.ts appId)
-const APP_SCHEME = 'app.lovable.c4920824037c4205bb9ed6cc0d5a0385';
+const APP_SCHEME = 'nota.npd.com';
 
 export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<GoogleUser | null>(null);
