@@ -37,7 +37,7 @@ interface GoogleAuthContextType {
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
 
-// Web Client ID (serverClientId - required for backend token validation)
+// Web Client ID (required for OAuth)
 const GOOGLE_WEB_CLIENT_ID = '52777395492-vnlk2hkr3pv15dtpgp2m51p7418vll90.apps.googleusercontent.com';
 
 // Scopes for Google APIs
@@ -52,10 +52,31 @@ const SCOPES = [
 const STORAGE_KEYS = {
   USER: 'google_user',
   TOKENS: 'google_tokens',
+  PKCE_VERIFIER: 'google_pkce_verifier',
 };
 
 // Custom URL scheme for deep linking (matches capacitor.config.ts appId)
 const APP_SCHEME = 'nota.npd.com';
+
+// Generate PKCE code verifier and challenge
+const generatePKCE = async () => {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const verifier = btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+  
+  return { verifier, challenge };
+};
 
 export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<GoogleUser | null>(null);
@@ -166,17 +187,19 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [startBackgroundSync]);
 
-  // Handle OAuth callback from deep link or URL
+  // Handle OAuth callback - now handles authorization code exchange
   const handleOAuthCallback = useCallback(async (url: string): Promise<boolean> => {
     try {
-      // Parse the URL to extract tokens from hash fragment
       const urlObj = new URL(url);
-      const hashParams = new URLSearchParams(urlObj.hash.substring(1));
       
-      const accessToken = hashParams.get('access_token');
-      const expiresIn = hashParams.get('expires_in');
-      const state = hashParams.get('state');
-      const error = hashParams.get('error');
+      // Check for authorization code in query params (code flow)
+      const code = urlObj.searchParams.get('code');
+      const error = urlObj.searchParams.get('error');
+      const state = urlObj.searchParams.get('state');
+      
+      // Also check hash for implicit flow fallback (web)
+      const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+      const accessTokenFromHash = hashParams.get('access_token');
       
       if (error) {
         console.error('[GoogleAuth] OAuth error:', error);
@@ -190,8 +213,52 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return false;
       }
       
+      let accessToken: string | null = null;
+      let refreshToken: string | undefined;
+      let expiresIn: number = 3600;
+      
+      if (code) {
+        // Authorization code flow - exchange code for tokens
+        const verifier = await getSetting<string>(STORAGE_KEYS.PKCE_VERIFIER, '');
+        
+        // Determine redirect URI based on platform
+        const redirectUri = Capacitor.isNativePlatform() 
+          ? `${APP_SCHEME}://oauth/callback`
+          : window.location.origin + '/auth/callback';
+        
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: GOOGLE_WEB_CLIENT_ID,
+            code,
+            code_verifier: verifier,
+            grant_type: 'authorization_code',
+            redirect_uri: redirectUri,
+          }),
+        });
+        
+        if (!tokenResponse.ok) {
+          const errorData = await tokenResponse.json();
+          console.error('[GoogleAuth] Token exchange failed:', errorData);
+          return false;
+        }
+        
+        const tokenData = await tokenResponse.json();
+        accessToken = tokenData.access_token;
+        refreshToken = tokenData.refresh_token;
+        expiresIn = tokenData.expires_in || 3600;
+        
+        // Clean up PKCE verifier
+        await removeSetting(STORAGE_KEYS.PKCE_VERIFIER);
+      } else if (accessTokenFromHash) {
+        // Implicit flow fallback (web popup)
+        accessToken = accessTokenFromHash;
+        expiresIn = parseInt(hashParams.get('expires_in') || '3600');
+      }
+      
       if (!accessToken) {
-        console.error('[GoogleAuth] No access token in callback');
+        console.error('[GoogleAuth] No access token received');
         return false;
       }
       
@@ -218,7 +285,8 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       const googleTokens: GoogleAuthTokens = {
         accessToken,
-        expiresAt: Date.now() + (parseInt(expiresIn || '3600') * 1000),
+        refreshToken,
+        expiresAt: Date.now() + (expiresIn * 1000),
       };
 
       setUser(googleUser);
@@ -328,18 +396,24 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const state = Math.random().toString(36).substring(7);
       sessionStorage.setItem('google_oauth_state', state);
       
+      // Generate PKCE challenge
+      const { verifier, challenge } = await generatePKCE();
+      await setSetting(STORAGE_KEYS.PKCE_VERIFIER, verifier);
+      
       if (Capacitor.isNativePlatform()) {
-        // Use in-app browser for OAuth on native platforms
-        // Redirect URI uses the custom URL scheme for deep linking
+        // Use authorization code flow with PKCE for native platforms
         const redirectUri = `${APP_SCHEME}://oauth/callback`;
         
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
         authUrl.searchParams.set('redirect_uri', redirectUri);
-        authUrl.searchParams.set('response_type', 'token');
+        authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('scope', SCOPES);
         authUrl.searchParams.set('state', state);
-        authUrl.searchParams.set('prompt', 'select_account');
+        authUrl.searchParams.set('code_challenge', challenge);
+        authUrl.searchParams.set('code_challenge_method', 'S256');
+        authUrl.searchParams.set('access_type', 'offline');
+        authUrl.searchParams.set('prompt', 'consent');
 
         // Open OAuth URL in in-app browser
         await Browser.open({ 
