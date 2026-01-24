@@ -1,6 +1,12 @@
 # Android Setup Guide for Npd
 
 This guide covers the required Android permissions and setup for push notifications, voice recording, and location-based reminders.
+dependencies {
+    implementation "com.android.billingclient:billing:7.1.1"
+}
+<item name="android:windowBackground">#3a6cc9</item>
+
+
 
 ## Prerequisites
 
